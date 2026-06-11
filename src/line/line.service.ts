@@ -123,6 +123,8 @@ export class LineService {
     const appUrl = process.env.APP_URL || 'http://localhost:3001';
     const imageUrl = `${appUrl}/uploads/line/${params.file.filename}`;
     console.log('[SEND] imageUrl:', imageUrl);
+    console.log('[SEND] senderId:', params.senderId);
+    console.log('[SEND] targetUserIds:', params.targetUserIds);
 
     const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
     if (!sender) return { error: 'ไม่พบผู้ใช้' };
@@ -134,6 +136,8 @@ export class LineService {
       const groups = await this.prisma.userLineGroup.findMany({
         where: { userId: targetUserId, isActive: true },
       });
+
+      console.log(`[SEND] userId=${targetUserId} groups found:`, groups.length);
 
       if (!groups.length) {
         results.push({ userId: targetUserId, status: 'failed', error: 'ไม่พบ LINE group' });
@@ -164,6 +168,7 @@ export class LineService {
           results.push({ userId: targetUserId, status: 'success' });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          console.error('[SEND] LINE error:', errorMessage, err);
           await this.prisma.lineSendLog.create({
             data: {
               senderId: params.senderId,

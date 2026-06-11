@@ -31,6 +31,11 @@ export class UsersService {
     return { id: user.id, email: user.email, fullName: user.fullName, role: user.role };
   }
 
+  async remove(id: string) {
+    await this.prisma.user.delete({ where: { id } });
+    return { success: true };
+  }
+
   async generateVerificationCode(userId: string) {
     const code = `BU-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
