@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         String   @default("user")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lineGroups        UserLineGroup[]
+  verificationCodes LineVerificationCode[]
+  sentLogs          LineSendLog[]         @relation("SenderLogs")
+  receivedLogs      LineSendLog[]         @relation("TargetLogs")
+}
+
+model UserLineGroup {
+  id          String    @id @default(cuid())
+  userId      String
+  lineGroupId String
+  isActive    Boolean   @default(true)
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, lineGroupId])
+}
+
+model LineVerificationCode {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model LineSendLog {
+  id           String   @id @default(cuid())
+  senderId     String
+  targetUserId String
+  lineGroupId  String
+  imageUrl     String
+  details      Json
+  status       String
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  sender     User @relation("SenderLogs", fields: [senderId], references: [id])
+  targetUser User @relation("TargetLogs", fields: [targetUserId], references: [id])
+}
