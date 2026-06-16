@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'line-api',
-      script: 'dist/main.js',
+      script: '/root/line-api/dist/main.js',
       cwd: '/root/line-api',
       instances: 1,
       autorestart: true,
