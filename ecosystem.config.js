@@ -5,6 +5,7 @@ module.exports = {
       script: '/root/line-api/dist/src/main.js',
       cwd: '/root/line-api',
       instances: 1,
+      exec_mode: 'cluster',
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
