@@ -78,34 +78,97 @@ export class LineService {
     }
   }
 
+  // Build image grid rows for Flex Message (2 images per row)
+  private buildImageGrid(imageUrls: string[]): any[] {
+    const rows: any[] = [];
+    for (let i = 0; i < imageUrls.length; i += 2) {
+      const pair = imageUrls.slice(i, i + 2);
+      rows.push({
+        type: 'box',
+        layout: 'horizontal',
+        spacing: 'xs',
+        contents: pair.map((url) => ({
+          type: 'image',
+          url,
+          flex: 1,
+          aspectMode: 'cover',
+          aspectRatio: '1:1',
+          animated: false,
+        })),
+      });
+    }
+    return rows;
+  }
+
   private buildFlexMessage(data: {
-    imageUrl: string;
+    imageUrls: string[];
     title: string;
     price?: string;
     note?: string;
     senderName: string;
   }): lineBot.messagingApi.FlexMessage {
+    const { imageUrls, title, price, note, senderName } = data;
+    const isSingle = imageUrls.length === 1;
+
+    const infoContents: any[] = [
+      { type: 'text', text: title, weight: 'bold', size: 'lg', wrap: true },
+      ...(price ? [{ type: 'text', text: `ราคา: ${price}`, size: 'md', color: '#e63c3c' }] : []),
+      ...(note ? [{ type: 'text', text: note, size: 'sm', color: '#666666', wrap: true }] : []),
+      { type: 'text', text: `โดย: ${senderName}`, size: 'xs', color: '#aaaaaa' },
+    ];
+
+    // Single image → hero (large) + info below
+    if (isSingle) {
+      return {
+        type: 'flex',
+        altText: `${senderName} ส่งรูปสินค้า: ${title}`,
+        contents: {
+          type: 'bubble',
+          hero: {
+            type: 'image',
+            url: imageUrls[0],
+            size: 'full',
+            aspectRatio: '4:3',
+            aspectMode: 'cover',
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: infoContents,
+          },
+        },
+      };
+    }
+
+    // Multiple images → grid + info below
     return {
       type: 'flex',
-      altText: `${data.senderName} ส่งรูปสินค้า: ${data.title}`,
+      altText: `${senderName} ส่งรูปสินค้า ${imageUrls.length} รูป: ${title}`,
       contents: {
         type: 'bubble',
-        hero: {
-          type: 'image',
-          url: data.imageUrl,
-          size: 'full',
-          aspectRatio: '4:3',
-          aspectMode: 'cover',
-        },
         body: {
           type: 'box',
           layout: 'vertical',
           spacing: 'sm',
+          paddingAll: 'none',
           contents: [
-            { type: 'text', text: data.title, weight: 'bold', size: 'lg', wrap: true },
-            ...(data.price ? [{ type: 'text' as const, text: `ราคา: ${data.price}`, size: 'md' as const, color: '#e63c3c' }] : []),
-            ...(data.note ? [{ type: 'text' as const, text: data.note, size: 'sm' as const, color: '#666666', wrap: true }] : []),
-            { type: 'text', text: `โดย: ${data.senderName}`, size: 'xs', color: '#aaaaaa' },
+            // Image grid (no padding)
+            {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'xs',
+              paddingAll: 'xs',
+              contents: this.buildImageGrid(imageUrls),
+            },
+            // Info section (with padding)
+            {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              paddingAll: 'md',
+              contents: infoContents,
+            },
           ],
         },
       },
@@ -114,17 +177,15 @@ export class LineService {
 
   async sendToGroups(params: {
     senderId: string;
-    file: Express.Multer.File;
+    files: Express.Multer.File[];
     targetUserIds: string[];
     title: string;
     price: string;
     note: string;
   }) {
     const appUrl = process.env.APP_URL || 'http://localhost:3001';
-    const imageUrl = `${appUrl}/uploads/line/${params.file.filename}`;
-    console.log('[SEND] imageUrl:', imageUrl);
-    console.log('[SEND] senderId:', params.senderId);
-    console.log('[SEND] targetUserIds:', params.targetUserIds);
+    const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
+    const primaryImageUrl = imageUrls[0];
 
     const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
     if (!sender) return { error: 'ไม่พบผู้ใช้' };
@@ -132,25 +193,23 @@ export class LineService {
     const client = this.getClient();
     const results = [];
 
+    const flexMsg = this.buildFlexMessage({
+      imageUrls,
+      title: params.title,
+      price: params.price,
+      note: params.note,
+      senderName: sender.fullName,
+    });
+
     for (const targetUserId of params.targetUserIds) {
       const groups = await this.prisma.userLineGroup.findMany({
         where: { userId: targetUserId, isActive: true },
       });
 
-      console.log(`[SEND] userId=${targetUserId} groups found:`, groups.length);
-
       if (!groups.length) {
         results.push({ userId: targetUserId, status: 'failed', error: 'ไม่พบ LINE group' });
         continue;
       }
-
-      const flexMsg = this.buildFlexMessage({
-        imageUrl,
-        title: params.title,
-        price: params.price,
-        note: params.note,
-        senderName: sender.fullName,
-      });
 
       for (const group of groups) {
         try {
@@ -160,22 +219,34 @@ export class LineService {
               senderId: params.senderId,
               targetUserId,
               lineGroupId: group.lineGroupId,
-              imageUrl,
-              details: { title: params.title, price: params.price, note: params.note },
+              imageUrl: primaryImageUrl,
+              details: {
+                title: params.title,
+                price: params.price,
+                note: params.note,
+                imageUrls,
+                imageCount: imageUrls.length,
+              },
               status: 'success',
             },
           });
           results.push({ userId: targetUserId, status: 'success' });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-          console.error('[SEND] LINE error:', errorMessage, err);
+          console.error('[SEND] LINE error:', errorMessage);
           await this.prisma.lineSendLog.create({
             data: {
               senderId: params.senderId,
               targetUserId,
               lineGroupId: group.lineGroupId,
-              imageUrl,
-              details: { title: params.title, price: params.price, note: params.note },
+              imageUrl: primaryImageUrl,
+              details: {
+                title: params.title,
+                price: params.price,
+                note: params.note,
+                imageUrls,
+                imageCount: imageUrls.length,
+              },
               status: 'failed',
               errorMessage,
             },
@@ -193,7 +264,7 @@ export class LineService {
     return this.prisma.lineSendLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 100,
       include: {
         targetUser: { select: { fullName: true, email: true } },
       },
@@ -202,7 +273,7 @@ export class LineService {
 
   async sendToAllGroups(params: {
     senderId: string;
-    file: Express.Multer.File;
+    files: Express.Multer.File[];
     title: string;
     price: string;
     note: string;

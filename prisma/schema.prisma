@@ -20,6 +20,7 @@ model User {
   verificationCodes LineVerificationCode[]
   sentLogs          LineSendLog[]         @relation("SenderLogs")
   receivedLogs      LineSendLog[]         @relation("TargetLogs")
+  visitRecords      VisitRecord[]
 }
 
 model UserLineGroup {
@@ -65,4 +66,21 @@ model LineSendLog {
 
   sender     User @relation("SenderLogs", fields: [senderId], references: [id])
   targetUser User @relation("TargetLogs", fields: [targetUserId], references: [id])
+}
+
+model VisitRecord {
+  id           String   @id @default(cuid())
+  userId       String
+  shopName     String
+  province     String
+  district     String?
+  latitude     Float
+  longitude    Float
+  customerType String
+  visitType    String?
+  details      String?
+  imageUrls    String[]
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
