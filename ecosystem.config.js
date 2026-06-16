@@ -16,7 +16,8 @@ module.exports = {
         DATABASE_URL: 'postgresql://postgres:postgres@localhost:5433/line_sender',
         APP_URL: 'https://sales.beautyup-enterprise.com',
         JWT_SECRET: 'your_jwt_secret_change_this',
-        // LINE_CHANNEL_ACCESS_TOKEN and LINE_CHANNEL_SECRET → set in .env on server
+        GOOGLE_DRIVE_FOLDER_ID: '1qIERO7DmCnYOG1hpNsDYzHpYDE04gSD0',
+        // LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, GOOGLE_CREDENTIALS, GOOGLE_SHEET_ID → set in .env on server
       },
     },
   ],

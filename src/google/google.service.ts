@@ -58,7 +58,7 @@ export class GoogleService {
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${title}!A:Z`,
+      range: `'${title}'!A:Z`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
@@ -74,13 +74,13 @@ export class GoogleService {
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: `${title}!A1`,
+      range: `'${title}'!A1`,
     });
 
     if (!res.data.values?.length) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `${title}!A1`,
+        range: `'${title}'!A1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[
