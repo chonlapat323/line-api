@@ -70,7 +70,7 @@ export class VisitsService {
 
     // Upload images to Google Drive
     const driveLinks: Record<string, string> = {};
-    const slotKeys = ['line', 'front', 'inside', 'xray'];
+    const slotKeys = ['front1', 'front2', 'inside1', 'inside2', 'line', 'xray'];
     for (const file of params.files) {
       const slotKey = slotKeys.find((k) => file.originalname.startsWith(k + '-'));
       if (!slotKey) continue;
@@ -98,9 +98,11 @@ export class VisitsService {
         params.visitType ? missionMap[params.visitType] : '',
         params.result ? resultMap[params.result] : '',
         params.details || '',
+        driveLinks['front1'] || '',
+        driveLinks['front2'] || '',
+        driveLinks['inside1'] || '',
+        driveLinks['inside2'] || '',
         driveLinks['line'] || '',
-        driveLinks['front'] || '',
-        driveLinks['inside'] || '',
         driveLinks['xray'] || '',
         String(params.latitude),
         String(params.longitude),
