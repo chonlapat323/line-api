@@ -3,3 +3,5 @@ dist
 .env
 uploads
 prisma/update-role.ts
+*.json.key
+beautyup-*.json

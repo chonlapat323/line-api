@@ -41,6 +41,7 @@ export class VisitsController {
       visitType: body.visitType || '',
       result: body.result || '',
       details: body.details || '',
+      userFullName: req.user.fullName || req.user.email,
     });
   }
 
