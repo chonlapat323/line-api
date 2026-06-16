@@ -21,8 +21,9 @@ export class GoogleService {
     const auth = this.getAuth();
     const drive = google.drive({ version: 'v3', auth });
 
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     const file = await drive.files.create({
-      requestBody: { name: filename },
+      requestBody: { name: filename, ...(folderId ? { parents: [folderId] } : {}) },
       media: { mimeType, body: fs.createReadStream(filePath) },
       fields: 'id',
     });
