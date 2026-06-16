@@ -6,9 +6,10 @@ module.exports = {
       cwd: '/root/line-api',
       instances: 1,
       exec_mode: 'fork',
+      node_args: '--max-old-space-size=400',
       autorestart: true,
       watch: false,
-      max_memory_restart: '500M',
+      max_memory_restart: '450M',
       env_production: {
         NODE_ENV: 'production',
         PORT: 3002,
