@@ -5,6 +5,7 @@ import * as fs from 'fs';
 @Injectable()
 export class GoogleService {
   private readonly logger = new Logger(GoogleService.name);
+  private sheetTitle: string | null = null;
 
   private getAuth() {
     const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS || '{}');
@@ -15,6 +16,16 @@ export class GoogleService {
         'https://www.googleapis.com/auth/drive',
       ],
     });
+  }
+
+  private async getFirstSheetTitle(): Promise<string> {
+    if (this.sheetTitle) return this.sheetTitle;
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    const auth = this.getAuth();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId! });
+    this.sheetTitle = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+    return this.sheetTitle;
   }
 
   async uploadFileToDrive(filePath: string, filename: string, mimeType: string): Promise<string> {
@@ -43,10 +54,11 @@ export class GoogleService {
 
     const auth = this.getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
+    const title = await this.getFirstSheetTitle();
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A:Z',
+      range: `${title}!A:Z`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
@@ -58,16 +70,17 @@ export class GoogleService {
 
     const auth = this.getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
+    const title = await this.getFirstSheetTitle();
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A1',
+      range: `${title}!A1`,
     });
 
     if (!res.data.values?.length) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: 'Sheet1!A1',
+        range: `${title}!A1`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[
