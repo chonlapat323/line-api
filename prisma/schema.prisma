@@ -76,8 +76,10 @@ model VisitRecord {
   district     String?
   latitude     Float
   longitude    Float
+  tripType     String?
   customerType String
   visitType    String?
+  result       String?
   details      String?
   imageUrls    String[]
   createdAt    DateTime @default(now())

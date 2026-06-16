@@ -36,8 +36,10 @@ export class VisitsController {
       district: body.district || '',
       latitude: parseFloat(body.latitude),
       longitude: parseFloat(body.longitude),
+      tripType: body.tripType || '',
       customerType: body.customerType,
       visitType: body.visitType || '',
+      result: body.result || '',
       details: body.details || '',
     });
   }

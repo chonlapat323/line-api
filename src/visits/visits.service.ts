@@ -17,14 +17,15 @@ export class VisitsService {
     district: string;
     latitude: number;
     longitude: number;
+    tripType: string;
     customerType: string;
     visitType: string;
+    result: string;
     details: string;
   }) {
-    const appUrl = process.env.APP_URL || 'http://localhost:3001';
-    const imageUrls = params.files.map((f) => `${appUrl}/uploads/visits/${f.filename}`);
+    const appUrl = process.env.APP_URL || 'http://localhost:3002';
+    const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
 
-    // Save visit record
     const record = await this.prisma.visitRecord.create({
       data: {
         userId: params.userId,
@@ -33,31 +34,34 @@ export class VisitsService {
         district: params.district || null,
         latitude: params.latitude,
         longitude: params.longitude,
+        tripType: params.tripType || null,
         customerType: params.customerType,
         visitType: params.visitType || null,
+        result: params.result || null,
         details: params.details || null,
         imageUrls,
       },
     });
 
-    // Build LINE note from visit context
     const locationLabel = params.district
       ? `${params.province} เขต${params.district}`
       : params.province;
 
-    const customerLabel =
-      params.customerType === 'new' ? 'ลูกค้าใหม่' : 'ลูกค้าเก่า';
-
-    const visitTypeMap: Record<string, string> = {
-      visit: 'เยี่ยมเยือน',
-      order: 'จดยอด',
-      delivery: 'เด็มงาน',
+    const tripMap: Record<string, string> = {
+      plan: 'ตามแผน', off_plan: 'นอกแผน', swap: 'สลับวัน',
     };
-    const visitLabel = params.visitType ? visitTypeMap[params.visitType] : '';
+    const missionMap: Record<string, string> = { tak: 'ทัก', dem: 'เดม' };
+    const resultMap: Record<string, string> = { buy: 'ซื้อ', no_buy: 'ไม่ซื้อ', not_found: 'ไม่พบ' };
+    const customerLabel = params.customerType === 'new' ? 'ลูกค้าใหม่' : 'ลูกค้าเก่า';
 
-    const noteParts = [locationLabel, customerLabel, visitLabel, params.details]
-      .filter(Boolean)
-      .join(' · ');
+    const noteParts = [
+      locationLabel,
+      params.tripType ? tripMap[params.tripType] : '',
+      customerLabel,
+      params.visitType ? missionMap[params.visitType] : '',
+      params.result ? `ผล: ${resultMap[params.result]}` : '',
+      params.details,
+    ].filter(Boolean).join(' · ');
 
     // Send to LINE Group
     const lineResult = await this.lineService.sendToGroups({
