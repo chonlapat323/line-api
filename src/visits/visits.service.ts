@@ -68,19 +68,12 @@ export class VisitsService {
       params.details,
     ].filter(Boolean).join(' · ');
 
-    // Upload images to Google Drive
-    const driveLinks: Record<string, string> = {};
+    // Map server image URLs by slot key for Sheet
     const slotKeys = ['front1', 'front2', 'inside1', 'inside2', 'line', 'xray'];
+    const slotUrls: Record<string, string> = {};
     for (const file of params.files) {
       const slotKey = slotKeys.find((k) => file.originalname.startsWith(k + '-'));
-      if (!slotKey) continue;
-      try {
-        const filePath = path.join(process.cwd(), 'uploads', 'line', file.filename);
-        const link = await this.googleService.uploadFileToDrive(filePath, file.originalname, file.mimetype);
-        driveLinks[slotKey] = link;
-      } catch (e) {
-        this.logger.warn(`Drive upload failed for ${file.originalname}: ${e.message}`);
-      }
+      if (slotKey) slotUrls[slotKey] = `${appUrl}/uploads/line/${file.filename}`;
     }
 
     // Append row to Google Sheet
@@ -98,12 +91,12 @@ export class VisitsService {
         params.visitType ? missionMap[params.visitType] : '',
         params.result ? resultMap[params.result] : '',
         params.details || '',
-        driveLinks['front1'] || '',
-        driveLinks['front2'] || '',
-        driveLinks['inside1'] || '',
-        driveLinks['inside2'] || '',
-        driveLinks['line'] || '',
-        driveLinks['xray'] || '',
+        slotUrls['front1'] || '',
+        slotUrls['front2'] || '',
+        slotUrls['inside1'] || '',
+        slotUrls['inside2'] || '',
+        slotUrls['line'] || '',
+        slotUrls['xray'] || '',
         String(params.latitude),
         String(params.longitude),
       ]);
