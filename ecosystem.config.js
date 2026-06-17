@@ -10,6 +10,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '450M',
+      env: {
+        PORT: 3003,
+      },
     },
   ],
 };
