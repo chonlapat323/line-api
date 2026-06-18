@@ -50,7 +50,7 @@ export class VisitsService {
     });
 
     const tripMap: Record<string, string> = {
-      plan: 'ตามแผน', off_plan: 'นอกแผน', swap: 'สลับวัน',
+      plan: 'ตามแผน', off_plan: 'นอกแผน',
     };
     const missionMap: Record<string, string> = { tak: 'ทัก', dem: 'เดม' };
     const resultMap: Record<string, string> = { buy: 'ซื้อ', no_buy: 'ไม่ซื้อ', not_found: 'ไม่พบ' };
