@@ -111,11 +111,6 @@ async function main() {
   let visitCount = 0;
 
   for (const u of saleUsers) {
-    const deleted = await prisma.visitRecord.deleteMany({ where: { userId: u.id } });
-    if (deleted.count > 0) {
-      console.log(`  🗑️  deleted ${deleted.count} old visits for ${u.email}`);
-    }
-
     const visits = buildVisits(u.id, randInt(10, 20));
     await prisma.visitRecord.createMany({ data: visits });
     visitCount += visits.length;
