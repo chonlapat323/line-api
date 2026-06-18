@@ -106,15 +106,14 @@ async function main() {
     console.log(`  ✅ user: ${user.email} (${user.fullName})`);
   }
 
-  // 2. Visit records — only for sale users that have 0 records
+  // 2. Visit records — delete existing mock records then recreate fresh
   const saleUsers = createdUsers.filter((u) => u.email !== 'admin@beautyup.com');
   let visitCount = 0;
 
   for (const u of saleUsers) {
-    const existing = await prisma.visitRecord.count({ where: { userId: u.id } });
-    if (existing > 0) {
-      console.log(`  ⏭️  skip visits: ${u.email} (${existing} records already)`);
-      continue;
+    const deleted = await prisma.visitRecord.deleteMany({ where: { userId: u.id } });
+    if (deleted.count > 0) {
+      console.log(`  🗑️  deleted ${deleted.count} old visits for ${u.email}`);
     }
 
     const visits = buildVisits(u.id, randInt(10, 20));
