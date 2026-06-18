@@ -81,6 +81,7 @@ model VisitRecord {
   visitType    String?
   result       String?
   details      String?
+  orderAmount  Float?
   imageUrls    String[]
   createdAt    DateTime @default(now())
 

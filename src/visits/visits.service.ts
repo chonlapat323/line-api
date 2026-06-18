@@ -27,6 +27,7 @@ export class VisitsService {
     visitType: string;
     result: string;
     details: string;
+    orderAmount: number | null;
     userFullName: string;
   }) {
     const appUrl = process.env.APP_URL || 'http://localhost:3002';
@@ -45,6 +46,7 @@ export class VisitsService {
         visitType: params.visitType || null,
         result: params.result || null,
         details: params.details || null,
+        orderAmount: params.orderAmount ?? null,
         imageUrls,
       },
     });
@@ -52,7 +54,7 @@ export class VisitsService {
     const tripMap: Record<string, string> = {
       plan: 'ตามแผน', off_plan: 'นอกแผน',
     };
-    const missionMap: Record<string, string> = { tak: 'ทัก', dem: 'เดม' };
+    const missionMap: Record<string, string> = { tak: 'ทัก', dem: 'เดม', tel: 'โทร' };
     const resultMap: Record<string, string> = { buy: 'ซื้อ', no_buy: 'ไม่ซื้อ', not_found: 'ไม่พบ' };
     const customerLabel = params.customerType === 'new' ? 'ลูกค้าใหม่' : 'ลูกค้าเก่า';
     const locationLabel = params.district
@@ -91,6 +93,7 @@ export class VisitsService {
         params.visitType ? missionMap[params.visitType] : '',
         params.result ? resultMap[params.result] : '',
         params.details || '',
+        params.orderAmount != null ? String(params.orderAmount) : '',
         slotUrls['front1'] || '',
         slotUrls['front2'] || '',
         slotUrls['inside1'] || '',
