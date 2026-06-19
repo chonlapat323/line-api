@@ -138,6 +138,7 @@ export class VisitsService {
     search?: string;
     dateFrom?: string;
     dateTo?: string;
+    slipStatus?: string;
   }) {
     const { userId, role, page, limit } = params;
     const skip = (page - 1) * limit;
@@ -147,6 +148,7 @@ export class VisitsService {
     if (params.province) where.province = params.province;
     if (params.result) where.result = params.result;
     if (params.tripType) where.tripType = params.tripType;
+    if (params.slipStatus) where.slipStatus = params.slipStatus;
     if (params.visitType) where.visitType = params.visitType;
     if (params.customerType) where.customerType = params.customerType;
     if (params.dateFrom || params.dateTo) {

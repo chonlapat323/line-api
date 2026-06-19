@@ -116,6 +116,7 @@ export class VisitsController {
       search: q.search,
       dateFrom: q.dateFrom,
       dateTo: q.dateTo,
+      slipStatus: q.slipStatus,
     });
   }
 }
