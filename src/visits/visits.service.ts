@@ -29,6 +29,9 @@ export class VisitsService {
     details: string;
     orderAmount: number | null;
     userEmail: string;
+    slipUrl?: string | null;
+    slipStatus?: string | null;
+    transRef?: string | null;
   }) {
     const appUrl = process.env.APP_URL || 'http://localhost:3002';
     const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
@@ -48,6 +51,9 @@ export class VisitsService {
         details: params.details || null,
         orderAmount: params.orderAmount ?? null,
         imageUrls,
+        slipUrl: params.slipUrl ?? null,
+        slipStatus: params.slipStatus ?? null,
+        transRef: params.transRef ?? null,
       },
     });
 
@@ -203,5 +209,29 @@ export class VisitsService {
       else if (r.result === 'not_found') result[r.province].notFound++;
     }
     return result;
+  }
+
+  async approveVisit(params: {
+    id: string;
+    action: 'approve' | 'reject';
+    amount?: number;
+    adminId: string;
+    role: string;
+  }) {
+    if (params.role !== 'admin') throw new Error('Forbidden');
+
+    const visit = await this.prisma.visitRecord.findUnique({ where: { id: params.id } });
+    if (!visit) throw new Error('Visit not found');
+    if (visit.slipStatus !== 'pending_approval') throw new Error('Visit is not pending approval');
+
+    return this.prisma.visitRecord.update({
+      where: { id: params.id },
+      data: {
+        slipStatus: params.action === 'approve' ? 'approved' : 'rejected',
+        orderAmount: params.action === 'approve' && params.amount != null ? params.amount : visit.orderAmount,
+        approvedBy: params.adminId,
+        approvedAt: new Date(),
+      },
+    });
   }
 }

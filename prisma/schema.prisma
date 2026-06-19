@@ -83,6 +83,11 @@ model VisitRecord {
   details      String?
   orderAmount  Float?
   imageUrls    String[]
+  slipUrl      String?
+  slipStatus   String?   // "verified" | "pending_approval" | "approved" | "rejected"
+  transRef     String?
+  approvedBy   String?
+  approvedAt   DateTime?
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
