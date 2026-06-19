@@ -94,7 +94,7 @@ export class VisitsService {
         params.shopName,                                        // ชื่อร้าน
         mapsUrl,                                                // Link Google Maps
         params.province,                                        // จังหวัด
-        '',                                                     // (*สำหรับทบทวน*)
+        '',                                                     // (*สำหรับกทม.*)
         params.result ? resultMap[params.result] : '',          // ผลตอบรับ
         slotUrls['line'] || '',                                 // Line OA (1 รูป)
         slotUrls['front1'] || '',                               // รูปหน้าร้าน (1รูป)
