@@ -42,7 +42,7 @@ export class VisitsController {
       result: body.result || '',
       details: body.details || '',
       orderAmount: body.orderAmount ? parseFloat(body.orderAmount) : null,
-      userFullName: req.user.fullName || req.user.email,
+      userEmail: req.user.email,
     });
   }
 

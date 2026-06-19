@@ -28,7 +28,7 @@ export class VisitsService {
     result: string;
     details: string;
     orderAmount: number | null;
-    userFullName: string;
+    userEmail: string;
   }) {
     const appUrl = process.env.APP_URL || 'http://localhost:3002';
     const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
@@ -80,28 +80,27 @@ export class VisitsService {
 
     // Append row to Google Sheet
     const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+    const mapsUrl = params.latitude && params.longitude
+      ? `https://maps.google.com/?q=${params.latitude},${params.longitude}`
+      : '';
     try {
       await this.googleService.ensureSheetHeader();
       await this.googleService.appendVisitRow([
-        now,
-        params.userFullName,
-        params.shopName,
-        params.province,
-        params.district || '',
-        params.tripType ? tripMap[params.tripType] : '',
-        customerLabel,
-        params.visitType ? missionMap[params.visitType] : '',
-        params.result ? resultMap[params.result] : '',
-        params.details || '',
-        params.orderAmount != null ? String(params.orderAmount) : '',
-        slotUrls['front1'] || '',
-        slotUrls['front2'] || '',
-        slotUrls['inside1'] || '',
-        slotUrls['inside2'] || '',
-        slotUrls['line'] || '',
-        slotUrls['xray'] || '',
-        String(params.latitude),
-        String(params.longitude),
+        now,                                                    // ประทับเวลา
+        params.userEmail,                                       // ที่อยู่อีเมล
+        params.tripType ? tripMap[params.tripType] : '',        // ทริป
+        params.visitType ? missionMap[params.visitType] : '',   // ภารกิจ
+        customerLabel,                                          // ลูกค้า
+        params.shopName,                                        // ชื่อร้าน
+        mapsUrl,                                                // Link Google Maps
+        params.province,                                        // จังหวัด
+        '',                                                     // (*สำหรับทบทวน*)
+        params.result ? resultMap[params.result] : '',          // ผลตอบรับ
+        slotUrls['line'] || '',                                 // Line OA (1 รูป)
+        slotUrls['front1'] || '',                               // รูปหน้าร้าน (1รูป)
+        slotUrls['inside1'] || '',                              // รูปในร้าน (1รูป)
+        params.details || '',                                   // สรุปผล
+        slotUrls['xray'] || '',                                 // ใบ X-Ray ส่ง (1รูป)
       ]);
     } catch (e) {
       this.logger.warn(`Google Sheets append failed: ${e.message}`);
