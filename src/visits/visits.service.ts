@@ -119,15 +119,89 @@ export class VisitsService {
     return { record, lineResult };
   }
 
-  async findByUser(userId: string, role: string) {
-    const where = role === 'admin' ? {} : { userId };
-    return this.prisma.visitRecord.findMany({
+  async findAll(params: {
+    userId: string;
+    role: string;
+    page: number;
+    limit: number;
+    province?: string;
+    result?: string;
+    tripType?: string;
+    visitType?: string;
+    customerType?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    const { userId, role, page, limit } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (role !== 'admin') where.userId = userId;
+    if (params.province) where.province = params.province;
+    if (params.result) where.result = params.result;
+    if (params.tripType) where.tripType = params.tripType;
+    if (params.visitType) where.visitType = params.visitType;
+    if (params.customerType) where.customerType = params.customerType;
+    if (params.dateFrom || params.dateTo) {
+      where.createdAt = {};
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom);
+      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo);
+    }
+    if (params.search) {
+      where.OR = [
+        { shopName: { contains: params.search, mode: 'insensitive' } },
+        { province: { contains: params.search, mode: 'insensitive' } },
+        { user: { fullName: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, allFiltered] = await Promise.all([
+      this.prisma.visitRecord.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: { user: { select: { fullName: true, email: true } } },
+      }),
+      this.prisma.visitRecord.findMany({
+        where,
+        select: { result: true, orderAmount: true },
+      }),
+    ]);
+
+    const stats = { total: allFiltered.length, buy: 0, noBuy: 0, notFound: 0, totalAmount: 0 };
+    for (const r of allFiltered) {
+      if (r.result === 'buy') { stats.buy++; stats.totalAmount += r.orderAmount ?? 0; }
+      else if (r.result === 'no_buy') stats.noBuy++;
+      else if (r.result === 'not_found') stats.notFound++;
+    }
+
+    return { data, total: stats.total, page, totalPages: Math.ceil(stats.total / limit), stats };
+  }
+
+  async getProvinceStats(params: { userId: string; role: string; dateFrom?: string; dateTo?: string }) {
+    const where: any = {};
+    if (params.role !== 'admin') where.userId = params.userId;
+    if (params.dateFrom || params.dateTo) {
+      where.createdAt = {};
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom);
+      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo);
+    }
+
+    const records = await this.prisma.visitRecord.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: {
-        user: { select: { fullName: true, email: true } },
-      },
+      select: { province: true, result: true, orderAmount: true },
     });
+
+    const result: Record<string, { total: number; buy: number; noBuy: number; notFound: number; totalAmount: number }> = {};
+    for (const r of records) {
+      if (!result[r.province]) result[r.province] = { total: 0, buy: 0, noBuy: 0, notFound: 0, totalAmount: 0 };
+      result[r.province].total++;
+      if (r.result === 'buy') { result[r.province].buy++; result[r.province].totalAmount += r.orderAmount ?? 0; }
+      else if (r.result === 'no_buy') result[r.province].noBuy++;
+      else if (r.result === 'not_found') result[r.province].notFound++;
+    }
+    return result;
   }
 }

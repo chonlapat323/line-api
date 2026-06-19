@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Body, UseGuards, UseInterceptors,
+  Controller, Post, Get, Body, Query, UseGuards, UseInterceptors,
   UploadedFiles, Request,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -46,9 +46,33 @@ export class VisitsController {
     });
   }
 
+  @Get('province-stats')
+  @UseGuards(JwtAuthGuard)
+  getProvinceStats(@Request() req, @Query() q: any) {
+    return this.visitsService.getProvinceStats({
+      userId: req.user.id,
+      role: req.user.role,
+      dateFrom: q.dateFrom,
+      dateTo: q.dateTo,
+    });
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard)
-  findAll(@Request() req) {
-    return this.visitsService.findByUser(req.user.id, req.user.role);
+  findAll(@Request() req, @Query() q: any) {
+    return this.visitsService.findAll({
+      userId: req.user.id,
+      role: req.user.role,
+      page: q.page ? parseInt(q.page) : 1,
+      limit: q.limit ? parseInt(q.limit) : 20,
+      province: q.province,
+      result: q.result,
+      tripType: q.tripType,
+      visitType: q.visitType,
+      customerType: q.customerType,
+      search: q.search,
+      dateFrom: q.dateFrom,
+      dateTo: q.dateTo,
+    });
   }
 }
