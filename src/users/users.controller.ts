@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,6 +16,11 @@ export class UsersController {
   @Get('me')
   getMe(@Request() req) {
     return this.usersService.findById(req.user.id);
+  }
+
+  @Patch('me')
+  updateMe(@Request() req, @Body() body: { bankName?: string; bankAccount?: string }) {
+    return this.usersService.updateMe(req.user.id, body);
   }
 
   @Post()

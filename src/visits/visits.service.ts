@@ -228,7 +228,7 @@ export class VisitsService {
         select: {
           userId: true,
           orderAmount: true,
-          user: { select: { id: true, fullName: true, email: true } },
+          user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
         },
       }),
       this.prisma.setting.findMany({
@@ -254,7 +254,7 @@ export class VisitsService {
       .map(({ user, count, totalAmount }) => {
         const reachedThreshold = threshold === 0 || totalAmount >= threshold;
         const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
-        return { userId: user.id, user: { fullName: user.fullName, email: user.email }, visitCount: count, totalAmount, reachedThreshold, commission };
+        return { userId: user.id, user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount }, visitCount: count, totalAmount, reachedThreshold, commission };
       })
       .sort((a, b) => b.totalAmount - a.totalAmount);
 

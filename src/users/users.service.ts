@@ -9,14 +9,22 @@ export class UsersService {
 
   async findAll() {
     return this.prisma.user.findMany({
-      select: { id: true, email: true, fullName: true, role: true, createdAt: true },
+      select: { id: true, email: true, fullName: true, role: true, bankName: true, bankAccount: true, createdAt: true },
     });
   }
 
   async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, fullName: true, role: true },
+      select: { id: true, email: true, fullName: true, role: true, bankName: true, bankAccount: true },
+    });
+  }
+
+  async updateMe(id: string, data: { bankName?: string; bankAccount?: string }) {
+    return this.prisma.user.update({
+      where: { id },
+      data,
+      select: { id: true, email: true, fullName: true, role: true, bankName: true, bankAccount: true },
     });
   }
 
