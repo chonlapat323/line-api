@@ -1,6 +1,6 @@
 import {
   Controller, Post, Patch, Get, Body, Param, Query,
-  UseGuards, UseInterceptors, UploadedFiles, UploadedFile, Request,
+  UseGuards, UseInterceptors, UploadedFiles, UploadedFile, Request, Logger,
 } from '@nestjs/common';
 import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage, memoryStorage } from 'multer';
@@ -20,6 +20,8 @@ const visitStorage = diskStorage({
 
 @Controller('visits')
 export class VisitsController {
+  private readonly logger = new Logger(VisitsController.name);
+
   constructor(
     private readonly visitsService: VisitsService,
     private readonly slipService: SlipService,
@@ -58,7 +60,16 @@ export class VisitsController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('slip', { storage: memoryStorage() }))
   async verifySlip(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      this.logger.warn('verify-slip called with no file');
+      return { success: false, raw: { error: 'no file uploaded' } };
+    }
+
+    this.logger.log(`verify-slip: file=${file.originalname} size=${file.size} mime=${file.mimetype}`);
+
     const result = await this.slipService.verify(file.buffer, file.originalname);
+
+    this.logger.log(`verify-slip result: success=${result.success} transRef=${result.transRef ?? '-'} amount=${result.amount ?? '-'}`);
 
     let slipUrl: string | null = null;
     if (file?.buffer) {
