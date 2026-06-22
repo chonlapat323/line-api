@@ -20,6 +20,19 @@ export class UsersService {
     });
   }
 
+  async updateUser(id: string, data: { fullName?: string; email?: string; role?: string; password?: string }) {
+    const updateData: any = {};
+    if (data.fullName) updateData.fullName = data.fullName;
+    if (data.email) updateData.email = data.email;
+    if (data.role) updateData.role = data.role;
+    if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 10);
+    return this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: { id: true, email: true, fullName: true, role: true, createdAt: true },
+    });
+  }
+
   async updateMe(id: string, data: { bankName?: string; bankAccount?: string }) {
     return this.prisma.user.update({
       where: { id },

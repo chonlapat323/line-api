@@ -28,6 +28,11 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: { fullName?: string; email?: string; role?: string; password?: string }) {
+    return this.usersService.updateUser(id, body);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
