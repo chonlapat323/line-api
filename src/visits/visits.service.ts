@@ -213,6 +213,54 @@ export class VisitsService {
     return result;
   }
 
+  async getCommissionSummary(month: string) {
+    const [year, monthNum] = month.split('-').map(Number);
+    const dateFrom = new Date(year, monthNum - 1, 1);
+    const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
+
+    const [visits, settings] = await Promise.all([
+      this.prisma.visitRecord.findMany({
+        where: {
+          result: 'buy',
+          slipStatus: { in: ['verified', 'approved'] },
+          createdAt: { gte: dateFrom, lte: dateTo },
+        },
+        select: {
+          userId: true,
+          orderAmount: true,
+          user: { select: { id: true, fullName: true, email: true } },
+        },
+      }),
+      this.prisma.setting.findMany({
+        where: { key: { in: ['commission_rate', 'commission_threshold'] } },
+      }),
+    ]);
+
+    const settingMap = Object.fromEntries(settings.map((s) => [s.key, parseFloat(s.value || '0')]));
+    const rate = settingMap['commission_rate'] ?? 0;
+    const threshold = settingMap['commission_threshold'] ?? 0;
+
+    const userMap = new Map<string, { user: any; count: number; totalAmount: number }>();
+    for (const visit of visits) {
+      if (!userMap.has(visit.userId)) {
+        userMap.set(visit.userId, { user: visit.user, count: 0, totalAmount: 0 });
+      }
+      const entry = userMap.get(visit.userId)!;
+      entry.count++;
+      entry.totalAmount += visit.orderAmount ?? 0;
+    }
+
+    const summary = Array.from(userMap.values())
+      .map(({ user, count, totalAmount }) => {
+        const reachedThreshold = threshold === 0 || totalAmount >= threshold;
+        const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
+        return { userId: user.id, user: { fullName: user.fullName, email: user.email }, visitCount: count, totalAmount, reachedThreshold, commission };
+      })
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    return { month, settings: { rate, threshold }, summary };
+  }
+
   async approveVisit(params: {
     id: string;
     action: 'approve' | 'reject';

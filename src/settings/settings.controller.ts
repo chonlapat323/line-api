@@ -36,4 +36,25 @@ export class SettingsController {
     if (body.easyslipSecret) await this.settingsService.set('easyslip_secret', body.easyslipSecret);
     return { ok: true };
   }
+
+  @Get('commission')
+  @UseGuards(JwtAuthGuard)
+  async getCommissionSettings() {
+    const rate = await this.settingsService.get('commission_rate');
+    const threshold = await this.settingsService.get('commission_threshold');
+    return {
+      rate: parseFloat(rate || '0'),
+      threshold: parseFloat(threshold || '0'),
+    };
+  }
+
+  @Patch('commission')
+  @UseGuards(JwtAuthGuard)
+  async updateCommissionSettings(
+    @Body() body: { rate?: number; threshold?: number },
+  ) {
+    if (body.rate != null) await this.settingsService.set('commission_rate', String(body.rate));
+    if (body.threshold != null) await this.settingsService.set('commission_threshold', String(body.threshold));
+    return { ok: true };
+  }
 }

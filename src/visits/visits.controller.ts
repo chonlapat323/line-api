@@ -100,6 +100,13 @@ export class VisitsController {
     });
   }
 
+  @Get('commission-summary')
+  @UseGuards(JwtAuthGuard)
+  getCommissionSummary(@Query('month') month: string) {
+    const m = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    return this.visitsService.getCommissionSummary(m);
+  }
+
   @Get('province-stats')
   @UseGuards(JwtAuthGuard)
   getProvinceStats(@Request() req, @Query() q: any) {
