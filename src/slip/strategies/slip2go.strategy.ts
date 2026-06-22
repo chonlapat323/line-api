@@ -24,13 +24,17 @@ export class Slip2GoStrategy implements ISlipStrategy {
     form.append('file', imageBuffer, { filename, contentType: 'image/jpeg' });
 
     try {
-      const { data: res } = await axios.post(
+      const { data: res, status, request: req } = await axios.post(
         `${this.BASE_URL}/api/verify-slip/qr-image/info`,
         form,
-        { headers: { ...form.getHeaders(), Authorization: `Bearer ${secret}` } },
+        {
+          headers: { ...form.getHeaders(), Authorization: `Bearer ${secret}` },
+          maxRedirects: 0,
+          validateStatus: (s) => s < 400,
+        },
       );
 
-      this.logger.log(`Slip2Go response: code=${res.code} hasData=${!!res.data}`);
+      this.logger.log(`Slip2Go HTTP ${status} code=${res?.code} hasData=${!!res?.data}`);
 
       if (res.code !== '200000' || !res.data) {
         this.logger.warn(`Slip2Go no QR: code=${res.code} message=${res.message ?? '-'}`);
@@ -51,8 +55,10 @@ export class Slip2GoStrategy implements ISlipStrategy {
         raw: d,
       };
     } catch (err: any) {
+      const status = err?.response?.status;
+      const location = err?.response?.headers?.location;
       const errData = err?.response?.data ?? err?.message;
-      this.logger.error(`Slip2Go request failed: ${JSON.stringify(errData)}`);
+      this.logger.error(`Slip2Go failed: HTTP ${status ?? '?'} location=${location ?? '-'} body=${JSON.stringify(errData)?.slice(0, 300)}`);
       return { success: false, raw: errData };
     }
   }
