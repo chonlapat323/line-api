@@ -6,7 +6,7 @@ import { ISlipStrategy, SlipVerifyResult } from '../slip-strategy.interface';
 @Injectable()
 export class Slip2GoStrategy implements ISlipStrategy {
   private readonly logger = new Logger(Slip2GoStrategy.name);
-  private readonly BASE_URL = 'https://api.slip2go.com';
+  private readonly BASE_URL = 'https://connect.slip2go.com';
 
   constructor(private readonly settings: SettingsService) {}
 
