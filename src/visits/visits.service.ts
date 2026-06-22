@@ -312,7 +312,10 @@ export class VisitsService {
       where: {
         userId: params.userId,
         result: 'buy',
-        slipStatus: { in: ['verified', 'approved'] },
+        OR: [
+          { slipStatus: { in: ['verified', 'approved'] } },
+          { slipStatus: null },
+        ],
         createdAt: { gte: dateFrom, lte: dateTo },
       },
       select: {
