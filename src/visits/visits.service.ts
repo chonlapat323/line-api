@@ -271,7 +271,7 @@ export class VisitsService {
         where: {
           userId,
           result: 'buy',
-          slipStatus: { in: ['verified', 'approved'] },
+          slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
         select: { id: true, shopName: true, orderAmount: true, slipStatus: true, createdAt: true },
