@@ -271,7 +271,6 @@ export class VisitsService {
         where: {
           userId,
           result: 'buy',
-          slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
         select: { id: true, shopName: true, orderAmount: true, slipStatus: true, createdAt: true },
@@ -285,7 +284,7 @@ export class VisitsService {
     const rate = settingMap['commission_rate'] ?? 0;
     const threshold = settingMap['commission_threshold'] ?? 0;
 
-    const confirmedVisits = visits.filter((v) => v.slipStatus === 'verified' || v.slipStatus === 'approved');
+    const confirmedVisits = visits.filter((v) => !v.slipStatus || v.slipStatus === 'verified' || v.slipStatus === 'approved');
     const pendingVisits = visits.filter((v) => v.slipStatus === 'pending_approval');
 
     const totalAmount = confirmedVisits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
