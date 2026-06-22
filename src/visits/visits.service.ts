@@ -222,15 +222,13 @@ export class VisitsService {
       this.prisma.visitRecord.findMany({
         where: {
           result: 'buy',
-          OR: [
-            { slipStatus: { in: ['verified', 'approved'] } },
-            { slipStatus: null },
-          ],
+          slipStatus: { not: 'rejected' },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
         select: {
           userId: true,
           orderAmount: true,
+          slipStatus: true,
           user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
         },
       }),
@@ -243,21 +241,25 @@ export class VisitsService {
     const rate = settingMap['commission_rate'] ?? 0;
     const threshold = settingMap['commission_threshold'] ?? 0;
 
-    const userMap = new Map<string, { user: any; count: number; totalAmount: number }>();
+    const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number }>();
     for (const visit of visits) {
       if (!userMap.has(visit.userId)) {
-        userMap.set(visit.userId, { user: visit.user, count: 0, totalAmount: 0 });
+        userMap.set(visit.userId, { user: visit.user, count: 0, totalAmount: 0, pendingCount: 0 });
       }
       const entry = userMap.get(visit.userId)!;
-      entry.count++;
-      entry.totalAmount += visit.orderAmount ?? 0;
+      if (visit.slipStatus === 'pending_approval') {
+        entry.pendingCount++;
+      } else {
+        entry.count++;
+        entry.totalAmount += visit.orderAmount ?? 0;
+      }
     }
 
     const summary = Array.from(userMap.values())
-      .map(({ user, count, totalAmount }) => {
+      .map(({ user, count, totalAmount, pendingCount }) => {
         const reachedThreshold = threshold === 0 || totalAmount >= threshold;
         const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
-        return { userId: user.id, user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount }, visitCount: count, totalAmount, reachedThreshold, commission };
+        return { userId: user.id, user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount }, visitCount: count, totalAmount, reachedThreshold, commission, pendingCount };
       })
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
