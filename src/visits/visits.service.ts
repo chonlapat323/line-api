@@ -261,6 +261,26 @@ export class VisitsService {
     return { month, settings: { rate, threshold }, summary };
   }
 
+  async getCommissionBreakdown(params: { userId: string; month: string }) {
+    const [year, monthNum] = params.month.split('-').map(Number);
+    const dateFrom = new Date(year, monthNum - 1, 1);
+    const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
+
+    return this.prisma.visitRecord.findMany({
+      where: {
+        userId: params.userId,
+        result: 'buy',
+        slipStatus: { in: ['verified', 'approved'] },
+        createdAt: { gte: dateFrom, lte: dateTo },
+      },
+      select: {
+        id: true, shopName: true, province: true, district: true,
+        orderAmount: true, slipUrl: true, slipStatus: true, transRef: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async approveVisit(params: {
     id: string;
     action: 'approve' | 'reject';

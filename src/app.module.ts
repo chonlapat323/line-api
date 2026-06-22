@@ -6,8 +6,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SettingsModule } from './settings/settings.module';
 import { VisitsModule } from './visits/visits.module';
 import { GoogleModule } from './google/google.module';
+import { CommissionPaymentsModule } from './commission-payments/commission-payments.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, LineModule, SettingsModule, VisitsModule, GoogleModule],
+  imports: [PrismaModule, AuthModule, UsersModule, LineModule, SettingsModule, VisitsModule, GoogleModule, CommissionPaymentsModule],
 })
 export class AppModule {}

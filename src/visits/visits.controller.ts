@@ -107,6 +107,12 @@ export class VisitsController {
     return this.visitsService.getCommissionSummary(m);
   }
 
+  @Get('commission-breakdown')
+  @UseGuards(JwtAuthGuard)
+  getCommissionBreakdown(@Query('userId') userId: string, @Query('month') month: string) {
+    return this.visitsService.getCommissionBreakdown({ userId, month });
+  }
+
   @Get('province-stats')
   @UseGuards(JwtAuthGuard)
   getProvinceStats(@Request() req, @Query() q: any) {
