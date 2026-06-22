@@ -107,6 +107,13 @@ export class VisitsController {
     return this.visitsService.getCommissionSummary(m);
   }
 
+  @Get('my-commission')
+  @UseGuards(JwtAuthGuard)
+  getMyCommission(@Request() req, @Query('month') month: string) {
+    const m = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    return this.visitsService.getMyCommission(req.user.id, m);
+  }
+
   @Get('commission-breakdown')
   @UseGuards(JwtAuthGuard)
   getCommissionBreakdown(@Query('userId') userId: string, @Query('month') month: string) {

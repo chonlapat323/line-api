@@ -261,6 +261,37 @@ export class VisitsService {
     return { month, settings: { rate, threshold }, summary };
   }
 
+  async getMyCommission(userId: string, month: string) {
+    const [year, monthNum] = month.split('-').map(Number);
+    const dateFrom = new Date(year, monthNum - 1, 1);
+    const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
+
+    const [visits, settings] = await Promise.all([
+      this.prisma.visitRecord.findMany({
+        where: {
+          userId,
+          result: 'buy',
+          slipStatus: { in: ['verified', 'approved'] },
+          createdAt: { gte: dateFrom, lte: dateTo },
+        },
+        select: { id: true, shopName: true, orderAmount: true, slipStatus: true, createdAt: true },
+      }),
+      this.prisma.setting.findMany({
+        where: { key: { in: ['commission_rate', 'commission_threshold'] } },
+      }),
+    ]);
+
+    const settingMap = Object.fromEntries(settings.map((s) => [s.key, parseFloat(s.value || '0')]));
+    const rate = settingMap['commission_rate'] ?? 0;
+    const threshold = settingMap['commission_threshold'] ?? 0;
+    const totalAmount = visits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
+    const reachedThreshold = threshold === 0 || totalAmount >= threshold;
+    const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
+    const remaining = reachedThreshold ? 0 : threshold - totalAmount;
+
+    return { month, visitCount: visits.length, totalAmount, reachedThreshold, commission, remaining, settings: { rate, threshold } };
+  }
+
   async getCommissionBreakdown(params: { userId: string; month: string }) {
     const [year, monthNum] = params.month.split('-').map(Number);
     const dateFrom = new Date(year, monthNum - 1, 1);
