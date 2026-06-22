@@ -20,11 +20,13 @@ export class UsersService {
     });
   }
 
-  async updateUser(id: string, data: { fullName?: string; email?: string; role?: string; password?: string }) {
+  async updateUser(id: string, data: { fullName?: string; email?: string; role?: string; password?: string; bankName?: string; bankAccount?: string }) {
     const updateData: any = {};
     if (data.fullName) updateData.fullName = data.fullName;
     if (data.email) updateData.email = data.email;
     if (data.role) updateData.role = data.role;
+    if (data.bankName !== undefined) updateData.bankName = data.bankName;
+    if (data.bankAccount !== undefined) updateData.bankAccount = data.bankAccount;
     if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 10);
     return this.prisma.user.update({
       where: { id },
