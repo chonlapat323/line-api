@@ -284,12 +284,21 @@ export class VisitsService {
     const settingMap = Object.fromEntries(settings.map((s) => [s.key, parseFloat(s.value || '0')]));
     const rate = settingMap['commission_rate'] ?? 0;
     const threshold = settingMap['commission_threshold'] ?? 0;
-    const totalAmount = visits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
+
+    const confirmedVisits = visits.filter((v) => v.slipStatus === 'verified' || v.slipStatus === 'approved');
+    const pendingVisits = visits.filter((v) => v.slipStatus === 'pending_approval');
+
+    const totalAmount = confirmedVisits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
+    const pendingAmount = pendingVisits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
     const reachedThreshold = threshold === 0 || totalAmount >= threshold;
     const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
     const remaining = reachedThreshold ? 0 : threshold - totalAmount;
 
-    return { month, visitCount: visits.length, totalAmount, reachedThreshold, commission, remaining, settings: { rate, threshold } };
+    return {
+      month, visitCount: visits.length, totalAmount, pendingAmount,
+      confirmedCount: confirmedVisits.length, pendingCount: pendingVisits.length,
+      reachedThreshold, commission, remaining, settings: { rate, threshold },
+    };
   }
 
   async getCommissionBreakdown(params: { userId: string; month: string }) {
