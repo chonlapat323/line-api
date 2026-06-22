@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import * as FormData from 'form-data';
 import { SettingsService } from '../../settings/settings.service';
 import { ISlipStrategy, SlipVerifyResult } from '../slip-strategy.interface';
 
 @Injectable()
 export class Slip2GoStrategy implements ISlipStrategy {
   private readonly logger = new Logger(Slip2GoStrategy.name);
-  private readonly BASE_URL = 'https://app.slip2go.com';
+  private readonly BASE_URL = 'https://api.slip2go.com';
 
   constructor(private readonly settings: SettingsService) {}
 
@@ -18,19 +17,20 @@ export class Slip2GoStrategy implements ISlipStrategy {
       return { success: false, raw: { error: 'slip2go_secret not configured' } };
     }
 
+    const mime = filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const imageBase64 = `data:${mime};base64,${imageBuffer.toString('base64')}`;
+
     this.logger.log(`Verifying slip: ${filename} (${imageBuffer.length} bytes)`);
 
-    const form = new FormData();
-    form.append('file', imageBuffer, { filename, contentType: 'image/jpeg' });
-
     try {
-      const { data: res, status, request: req } = await axios.post(
-        `${this.BASE_URL}/api/verify-slip/qr-image/info`,
-        form,
+      const { data: res, status } = await axios.post(
+        `${this.BASE_URL}/api/verify-slip/qr-base64/info`,
+        { payload: { imageBase64 } },
         {
-          headers: { ...form.getHeaders(), Authorization: `Bearer ${secret}` },
-          maxRedirects: 0,
-          validateStatus: (s) => s < 400,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${secret}`,
+          },
         },
       );
 
@@ -56,9 +56,8 @@ export class Slip2GoStrategy implements ISlipStrategy {
       };
     } catch (err: any) {
       const status = err?.response?.status;
-      const location = err?.response?.headers?.location;
       const errData = err?.response?.data ?? err?.message;
-      this.logger.error(`Slip2Go failed: HTTP ${status ?? '?'} location=${location ?? '-'} body=${JSON.stringify(errData)?.slice(0, 300)}`);
+      this.logger.error(`Slip2Go failed: HTTP ${status ?? '?'} body=${JSON.stringify(errData)?.slice(0, 300)}`);
       return { success: false, raw: errData };
     }
   }
