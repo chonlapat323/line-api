@@ -148,6 +148,7 @@ export class VisitsController {
       dateFrom: q.dateFrom,
       dateTo: q.dateTo,
       slipStatus: q.slipStatus,
+      filterUserId: q.filterUserId,
     });
   }
 }
