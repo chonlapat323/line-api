@@ -6,6 +6,7 @@ import * as fs from 'fs';
 export class GoogleService {
   private readonly logger = new Logger(GoogleService.name);
   private sheetTitle: string | null = null;
+  private sheetTitleCache = new Map<string, string>();
 
   private getAuth() {
     const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS || '{}');
@@ -62,6 +63,47 @@ export class GoogleService {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
+  }
+
+  private async getSheetTitleById(sheetId: string): Promise<string> {
+    if (this.sheetTitleCache.has(sheetId)) return this.sheetTitleCache.get(sheetId)!;
+    const auth = this.getAuth();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const title = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+    this.sheetTitleCache.set(sheetId, title);
+    return title;
+  }
+
+  async appendToSheetById(sheetId: string, row: string[], header: string[]): Promise<void> {
+    if (!sheetId) return;
+    try {
+      const auth = this.getAuth();
+      const sheets = google.sheets({ version: 'v4', auth });
+      const title = await this.getSheetTitleById(sheetId);
+
+      const existing = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `'${title}'!A1`,
+      });
+      if (!existing.data.values?.length) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `'${title}'!A1`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [header] },
+        });
+      }
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: `'${title}'!A:Z`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [row] },
+      });
+    } catch (e) {
+      this.logger.warn(`appendToSheetById failed: ${e.message}`);
+    }
   }
 
   async ensureSheetHeader(): Promise<void> {

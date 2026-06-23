@@ -343,18 +343,48 @@ export class VisitsService {
   }) {
     if (params.role !== 'admin') throw new Error('Forbidden');
 
-    const visit = await this.prisma.visitRecord.findUnique({ where: { id: params.id } });
+    const visit = await this.prisma.visitRecord.findUnique({
+      where: { id: params.id },
+      include: { user: { select: { email: true, fullName: true } } },
+    });
     if (!visit) throw new Error('Visit not found');
     if (visit.slipStatus !== 'pending_approval') throw new Error('Visit is not pending approval');
 
-    return this.prisma.visitRecord.update({
+    const finalAmount = params.action === 'approve' && params.amount != null ? params.amount : visit.orderAmount;
+
+    const updated = await this.prisma.visitRecord.update({
       where: { id: params.id },
       data: {
         slipStatus: params.action === 'approve' ? 'approved' : 'rejected',
-        orderAmount: params.action === 'approve' && params.amount != null ? params.amount : visit.orderAmount,
+        orderAmount: finalAmount,
         approvedBy: params.adminId,
         approvedAt: new Date(),
       },
     });
+
+    if (params.action === 'approve') {
+      const sheetSetting = await this.prisma.setting.findUnique({ where: { key: 'commission_sheet_id' } });
+      const sheetId = sheetSetting?.value;
+      if (sheetId) {
+        const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        const customerLabel = visit.customerType === 'new' ? 'ลูกค้าใหม่' : 'ลูกค้าเก่า';
+        await this.googleService.appendToSheetById(
+          sheetId,
+          [
+            now,
+            visit.user?.email || '',
+            visit.slipUrl || '',
+            visit.details || '',
+            visit.province || '',
+            visit.shopName || '',
+            String(finalAmount ?? 0),
+            customerLabel,
+          ],
+          ['ประทับเวลา', 'ที่อยู่อีเมล', 'สลิปธนาคาร', 'หมายเหตุ (ถ้ามี)', 'จังหวัด', 'ชื่อร้าน', 'ยอดเงิน (บาท)', 'ลูกค้า'],
+        );
+      }
+    }
+
+    return updated;
   }
 }

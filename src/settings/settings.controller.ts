@@ -57,4 +57,25 @@ export class SettingsController {
     if (body.threshold != null) await this.settingsService.set('commission_threshold', String(body.threshold));
     return { ok: true };
   }
+
+  @Get('sheets')
+  @UseGuards(JwtAuthGuard)
+  async getSheetSettings() {
+    const visitSheetId     = await this.settingsService.get('visit_sheet_id');
+    const commissionSheetId = await this.settingsService.get('commission_sheet_id');
+    return {
+      visitSheetId:      visitSheetId      || process.env.GOOGLE_SHEET_ID || '',
+      commissionSheetId: commissionSheetId || '',
+    };
+  }
+
+  @Patch('sheets')
+  @UseGuards(JwtAuthGuard)
+  async updateSheetSettings(
+    @Body() body: { visitSheetId?: string; commissionSheetId?: string },
+  ) {
+    if (body.visitSheetId      !== undefined) await this.settingsService.set('visit_sheet_id',      body.visitSheetId);
+    if (body.commissionSheetId !== undefined) await this.settingsService.set('commission_sheet_id', body.commissionSheetId);
+    return { ok: true };
+  }
 }
