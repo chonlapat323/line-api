@@ -322,6 +322,7 @@ export class VisitsService {
       },
       select: {
         id: true, shopName: true, province: true, district: true,
+        customerType: true, details: true,
         orderAmount: true, slipUrl: true, slipStatus: true, transRef: true, createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
