@@ -112,6 +112,32 @@ export class VisitsService {
       this.logger.warn(`Google Sheets append failed: ${e.message}`);
     }
 
+    // Log to commission sheet if QR-verified slip (no admin approval needed)
+    if (params.result === 'buy' && params.slipStatus === 'verified') {
+      try {
+        const sheetSetting = await this.prisma.setting.findUnique({ where: { key: 'commission_sheet_id' } });
+        const sheetId = sheetSetting?.value;
+        if (sheetId) {
+          await this.googleService.appendToSheetById(
+            sheetId,
+            [
+              now,
+              params.userEmail,
+              params.slipUrl || '',
+              params.details || '',
+              params.province || '',
+              params.shopName || '',
+              String(params.orderAmount ?? 0),
+              customerLabel,
+            ],
+            ['ประทับเวลา', 'ที่อยู่อีเมล', 'สลิปธนาคาร', 'หมายเหตุ (ถ้ามี)', 'จังหวัด', 'ชื่อร้าน', 'ยอดเงิน (บาท)', 'ลูกค้า'],
+          );
+        }
+      } catch (e) {
+        this.logger.warn(`Commission sheet log failed: ${e.message}`);
+      }
+    }
+
     // Send to LINE Group
     const lineResult = await this.lineService.sendToGroups({
       senderId: params.userId,
