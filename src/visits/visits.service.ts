@@ -222,7 +222,10 @@ export class VisitsService {
       this.prisma.visitRecord.findMany({
         where: {
           result: 'buy',
-          slipStatus: { not: 'rejected' },
+          OR: [
+            { slipStatus: { in: ['verified', 'approved', 'pending_approval'] } },
+            { slipStatus: null },
+          ],
           createdAt: { gte: dateFrom, lte: dateTo },
         },
         select: {
