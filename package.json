@@ -19,7 +19,12 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "@swc/jest"
+      "^.+\\.(t|j)s$": ["@swc/jest", {
+        "jsc": {
+          "parser": { "syntax": "typescript", "decorators": true },
+          "transform": { "decoratorMetadata": true }
+        }
+      }]
     },
     "testEnvironment": "node"
   },
@@ -44,6 +49,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.1.27",
     "@swc/core": "^1.15.41",
     "@swc/jest": "^0.2.39",
     "@types/bcryptjs": "^2.4.6",
