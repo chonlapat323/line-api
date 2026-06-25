@@ -3,6 +3,7 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineService } from '../line/line.service';
 import { GoogleService } from '../google/google.service';
+import { calculateCommission, classifyVisits } from './commission.utils';
 
 @Injectable()
 export class VisitsService {
@@ -288,8 +289,7 @@ export class VisitsService {
 
     const summary = Array.from(userMap.values())
       .map(({ user, count, totalAmount, pendingCount }) => {
-        const reachedThreshold = threshold === 0 || totalAmount >= threshold;
-        const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
+        const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold });
         return { userId: user.id, user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount }, visitCount: count, totalAmount, reachedThreshold, commission, pendingCount };
       })
       .sort((a, b) => b.totalAmount - a.totalAmount);
@@ -320,14 +320,8 @@ export class VisitsService {
     const rate = settingMap['commission_rate'] ?? 0;
     const threshold = settingMap['commission_threshold'] ?? 0;
 
-    const confirmedVisits = visits.filter((v) => !v.slipStatus || v.slipStatus === 'verified' || v.slipStatus === 'approved');
-    const pendingVisits = visits.filter((v) => v.slipStatus === 'pending_approval');
-
-    const totalAmount = confirmedVisits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
-    const pendingAmount = pendingVisits.reduce((s, v) => s + (v.orderAmount ?? 0), 0);
-    const reachedThreshold = threshold === 0 || totalAmount >= threshold;
-    const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
-    const remaining = reachedThreshold ? 0 : threshold - totalAmount;
+    const { confirmed: confirmedVisits, pending: pendingVisits, totalAmount, pendingAmount } = classifyVisits(visits);
+    const { reachedThreshold, commission, remaining } = calculateCommission({ totalAmount, rate, threshold });
 
     return {
       month, visitCount: visits.length, totalAmount, pendingAmount,
