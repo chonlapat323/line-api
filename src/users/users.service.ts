@@ -9,29 +9,38 @@ export class UsersService {
 
   async findAll() {
     return this.prisma.user.findMany({
-      select: { id: true, email: true, fullName: true, role: true, bankName: true, bankAccount: true, createdAt: true },
+      select: {
+        id: true, email: true, fullName: true, role: true, roleId: true,
+        bankName: true, bankAccount: true, createdAt: true,
+        roleRef: { select: { label: true } },
+      },
     });
   }
 
   async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, fullName: true, role: true, bankName: true, bankAccount: true },
+      select: {
+        id: true, email: true, fullName: true, role: true, roleId: true,
+        bankName: true, bankAccount: true,
+        roleRef: { select: { label: true } },
+      },
     });
   }
 
-  async updateUser(id: string, data: { fullName?: string; email?: string; role?: string; password?: string; bankName?: string; bankAccount?: string }) {
+  async updateUser(id: string, data: { fullName?: string; email?: string; role?: string; roleId?: string | null; password?: string; bankName?: string; bankAccount?: string }) {
     const updateData: any = {};
     if (data.fullName) updateData.fullName = data.fullName;
     if (data.email) updateData.email = data.email;
     if (data.role) updateData.role = data.role;
+    if (data.roleId !== undefined) updateData.roleId = data.roleId || null;
     if (data.bankName !== undefined) updateData.bankName = data.bankName;
     if (data.bankAccount !== undefined) updateData.bankAccount = data.bankAccount;
     if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 10);
     return this.prisma.user.update({
       where: { id },
       data: updateData,
-      select: { id: true, email: true, fullName: true, role: true, createdAt: true },
+      select: { id: true, email: true, fullName: true, role: true, roleId: true, createdAt: true },
     });
   }
 

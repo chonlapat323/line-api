@@ -1,6 +1,8 @@
 import { Controller, Get, Body, Patch, UseGuards } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('settings')
 export class SettingsController {
@@ -12,7 +14,8 @@ export class SettingsController {
   }
 
   @Patch()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'settings', action: 'canEdit' })
   update(@Body() body: { lineBotId: string }) {
     return this.settingsService.set('LINE_BOT_ID', body.lineBotId);
   }
@@ -27,7 +30,8 @@ export class SettingsController {
   }
 
   @Patch('slip')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'settings', action: 'canEdit' })
   async updateSlipSettings(
     @Body() body: { provider?: string; slip2goSecret?: string; easyslipSecret?: string },
   ) {
@@ -49,7 +53,8 @@ export class SettingsController {
   }
 
   @Patch('commission')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'settings', action: 'canEdit' })
   async updateCommissionSettings(
     @Body() body: { rate?: number; threshold?: number },
   ) {
@@ -70,7 +75,8 @@ export class SettingsController {
   }
 
   @Patch('sheets')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'settings', action: 'canEdit' })
   async updateSheetSettings(
     @Body() body: { visitSheetId?: string; commissionSheetId?: string },
   ) {

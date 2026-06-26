@@ -10,6 +10,8 @@ import * as path from 'path';
 import { VisitsService } from './visits.service';
 import { SlipService } from '../slip/slip.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 const visitStorage = diskStorage({
   destination: './uploads/line',
@@ -85,7 +87,8 @@ export class VisitsController {
   }
 
   @Patch(':id/approve')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canEdit' })
   async approveVisit(
     @Param('id') id: string,
     @Body() body: { action: 'approve' | 'reject'; amount?: number },
