@@ -8,7 +8,8 @@
     "seed": "node prisma/seed.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "postinstall": "prisma generate"
   },
   "jest": {
     "moduleFileExtensions": [
