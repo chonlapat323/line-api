@@ -93,7 +93,7 @@ const TRIP_TYPES     = ['plan', 'off_plan'] as const;
 const CUSTOMER_TYPES = ['new', 'existing'] as const;
 const VISIT_TYPES    = ['tak', 'dem', 'tel'] as const;
 const RESULTS        = ['buy', 'buy', 'buy', 'no_buy', 'not_found'] as const;
-const SLIP_STATUSES  = ['verified', 'verified', 'approved', 'pending_approval', 'rejected', null];
+const SLIP_STATUSES: (string | null)[] = ['verified', 'verified', 'approved', 'pending_approval', 'rejected', null];
 
 function rand<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -115,7 +115,7 @@ function buildVisits(userId: string, count: number) {
     const district  = districts.length ? rand(districts) : '';
     const result    = rand(RESULTS);
     const orderAmount = result === 'buy' ? randInt(1, 50) * 100 : null;
-    const slipStatus  = result === 'buy' ? rand(SLIP_STATUSES as any) : null;
+    const slipStatus  = result === 'buy' ? rand(SLIP_STATUSES) : null;
 
     return {
       userId,
