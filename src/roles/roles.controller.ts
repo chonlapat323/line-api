@@ -15,13 +15,11 @@ export class RolesController {
   }
 
   @Get()
-  @Roles({ menu: 'roles', action: 'canView' })
   findAll() {
     return this.rolesService.findAll();
   }
 
   @Get(':id')
-  @Roles({ menu: 'roles', action: 'canView' })
   findOne(@Param('id') id: string) {
     return this.rolesService.findOne(id);
   }
