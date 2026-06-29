@@ -3,13 +3,65 @@ const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
-const USERS = [
-  { email: 'admin@beautyup.com', fullName: 'Admin BeautyUp',  role: 'admin', password: 'admin1234' },
-  { email: 'sale1@beautyup.com', fullName: 'สมชาย วงศ์ดี',   role: 'user',  password: 'sale1234' },
-  { email: 'sale2@beautyup.com', fullName: 'สมหญิง ใจดี',     role: 'user',  password: 'sale1234' },
-  { email: 'sale3@beautyup.com', fullName: 'วิชาญ รักงาน',    role: 'user',  password: 'sale1234' },
+// ── Menus (mirror roles.service.ts MENUS) ────────────────────────────────────
+const MENUS = [
+  { menu: 'dashboard',   label: 'ภาพรวม' },
+  { menu: 'sales',       label: 'สถิติเซล' },
+  { menu: 'visits',      label: 'ประวัติการเยี่ยม' },
+  { menu: 'approvals',   label: 'จัดการสลิป' },
+  { menu: 'commissions', label: 'ค่าคอมมิชชัน' },
+  { menu: 'users',       label: 'จัดการ Users' },
+  { menu: 'roles',       label: 'จัดการสิทธิ์' },
+  { menu: 'settings',    label: 'ตั้งค่า' },
+  { menu: 'line',        label: 'LINE' },
 ];
 
+// ── Roles ─────────────────────────────────────────────────────────────────────
+const ROLES = [
+  {
+    name: 'admin',
+    label: 'แอดมิน',
+    permissions: MENUS.map((m) => ({ menu: m.menu, label: m.label, canView: true, canEdit: true, canDelete: true })),
+    isSystem: true,
+    isActive: true,
+  },
+  {
+    name: 'manager',
+    label: 'ผู้จัดการ',
+    permissions: MENUS.map((m) => ({
+      menu: m.menu,
+      label: m.label,
+      canView: true,
+      canEdit: ['visits', 'approvals', 'users'].includes(m.menu),
+      canDelete: false,
+    })),
+    isSystem: false,
+    isActive: true,
+  },
+  {
+    name: 'user',
+    label: 'ผู้ใช้ทั่วไป',
+    permissions: MENUS.map((m) => ({
+      menu: m.menu,
+      label: m.label,
+      canView: ['dashboard', 'visits', 'commissions'].includes(m.menu),
+      canEdit: false,
+      canDelete: false,
+    })),
+    isSystem: false,
+    isActive: true,
+  },
+];
+
+// ── Users ────────────────────────────────────────────────────────────────────
+const USERS = [
+  { email: 'admin@beautyup.com', fullName: 'Admin BeautyUp', role: 'admin',   roleName: 'admin',   password: 'admin1234' },
+  { email: 'sale1@beautyup.com', fullName: 'สมชาย วงศ์ดี',   role: 'user',    roleName: 'user',    password: 'sale1234' },
+  { email: 'sale2@beautyup.com', fullName: 'สมหญิง ใจดี',     role: 'user',    roleName: 'user',    password: 'sale1234' },
+  { email: 'sale3@beautyup.com', fullName: 'วิชาญ รักงาน',    role: 'manager', roleName: 'manager', password: 'sale1234' },
+];
+
+// ── Province data ─────────────────────────────────────────────────────────────
 const PROVINCES = [
   { name: 'กรุงเทพมหานคร', lat: 13.7563, lng: 100.5018 },
   { name: 'เชียงใหม่',      lat: 18.7883, lng: 98.9853  },
@@ -37,16 +89,14 @@ const SHOP_NAMES = [
   'ร้านมนต์เสน่ห์', 'ร้านรุ้งทอง', 'ร้านดวงดาว', 'ร้านทองหล่อ',
 ];
 
-const TRIP_TYPES    = ['plan', 'off_plan'];
+const TRIP_TYPES     = ['plan', 'off_plan'];
 const CUSTOMER_TYPES = ['new', 'existing'];
-const VISIT_TYPES   = ['tak', 'dem', 'tel'];
-const RESULTS       = ['buy', 'buy', 'buy', 'no_buy', 'not_found'];
-// slipStatus distribution for buy records
-const SLIP_STATUSES = ['verified', 'verified', 'approved', 'pending_approval', 'rejected', null];
+const VISIT_TYPES    = ['tak', 'dem', 'tel'];
+const RESULTS        = ['buy', 'buy', 'buy', 'no_buy', 'not_found'];
+const SLIP_STATUSES  = ['verified', 'verified', 'approved', 'pending_approval', 'rejected', null];
 
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
 function daysAgo(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -55,15 +105,13 @@ function daysAgo(n) {
 }
 
 function buildVisits(userId, count) {
-  return Array.from({ length: count }, (_, i) => {
+  return Array.from({ length: count }, () => {
     const province   = rand(PROVINCES);
     const districts  = DISTRICTS[province.name] || [];
     const district   = districts.length ? rand(districts) : '';
     const result     = rand(RESULTS);
     const orderAmount = result === 'buy' ? randInt(1, 50) * 100 : null;
     const slipStatus  = result === 'buy' ? rand(SLIP_STATUSES) : null;
-    // spread across last 60 days (2 months)
-    const daysBack   = randInt(0, 59);
 
     return {
       userId,
@@ -80,28 +128,47 @@ function buildVisits(userId, count) {
       orderAmount,
       imageUrls:    [],
       slipStatus,
-      createdAt:    daysAgo(daysBack),
+      createdAt:    daysAgo(randInt(0, 59)),
     };
   });
 }
 
+// ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('🌱 Seeding...\n');
+  console.log('Seeding...\n');
 
-  // 1. Upsert users
+  // 1. Upsert roles
+  const roleMap = {};
+  for (const r of ROLES) {
+    const role = await prisma.role.upsert({
+      where:  { name: r.name },
+      update: { label: r.label, permissions: r.permissions, isActive: r.isActive },
+      create: { name: r.name, label: r.label, permissions: r.permissions, isSystem: r.isSystem, isActive: r.isActive },
+    });
+    roleMap[r.name] = role.id;
+    console.log(`  role: ${role.name} (${role.label}) — ${role.id}`);
+  }
+
+  // 2. Upsert users and assign roleId
   const createdUsers = [];
   for (const u of USERS) {
     const hash = await bcrypt.hash(u.password, 10);
     const user = await prisma.user.upsert({
       where:  { email: u.email },
-      update: {},
-      create: { email: u.email, passwordHash: hash, fullName: u.fullName, role: u.role },
+      update: { roleId: roleMap[u.roleName] },
+      create: {
+        email:        u.email,
+        passwordHash: hash,
+        fullName:     u.fullName,
+        role:         u.role,
+        roleId:       roleMap[u.roleName],
+      },
     });
     createdUsers.push(user);
-    console.log(`  ✅ user: ${user.email} (${user.fullName})`);
+    console.log(`  user: ${user.email} (${u.fullName}) — role: ${u.roleName}`);
   }
 
-  // 2. Visit records
+  // 3. Visit records for sale/manager users
   const saleUsers = createdUsers.filter((u) => u.role !== 'admin');
   let total = 0;
 
@@ -109,10 +176,10 @@ async function main() {
     const visits = buildVisits(u.id, randInt(15, 25));
     await prisma.visitRecord.createMany({ data: visits });
     total += visits.length;
-    console.log(`  📋 ${visits.length} visits → ${u.fullName}`);
+    console.log(`  ${visits.length} visits -> ${u.email}`);
   }
 
-  console.log(`\n✅ Seed complete — ${total} visit records created`);
+  console.log(`\nDone — ${total} visit records, ${ROLES.length} roles, ${USERS.length} users`);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

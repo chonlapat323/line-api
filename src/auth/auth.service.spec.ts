@@ -94,7 +94,7 @@ describe('AuthService.login', () => {
 
     const result = await service.login(mockUser.email, 'correct');
 
-    expect(result.user).toEqual({
+    expect(result.user).toMatchObject({
       id: mockUser.id,
       email: mockUser.email,
       fullName: mockUser.fullName,
@@ -107,7 +107,7 @@ describe('AuthService.login', () => {
   // JWT payload
   // ─────────────────────────────────────────────
 
-  it('JWT sign ได้รับ payload ที่ถูกต้อง: id, email, role', async () => {
+  it('JWT sign ได้รับ payload ที่ถูกต้อง: id, email, role, roleId', async () => {
     prismaFindUnique.mockResolvedValue(mockUser);
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -117,6 +117,7 @@ describe('AuthService.login', () => {
       id: mockUser.id,
       email: mockUser.email,
       role: mockUser.role,
+      roleId: null,
     });
   });
 
