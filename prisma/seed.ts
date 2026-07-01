@@ -137,6 +137,188 @@ function buildVisits(userId: string, count: number) {
   });
 }
 
+// ── June 2026 Mockup — 77 จังหวัด ────────────────────────────────────────────
+const JUNE_WORKDAYS: number[] = [];
+for (let d = 1; d <= 30; d++) {
+  if (new Date(2026, 5, d).getDay() !== 0) JUNE_WORKDAYS.push(d);
+}
+function juneDate(): Date {
+  const day = rand(JUNE_WORKDAYS);
+  return new Date(2026, 5, day, randInt(8, 17), randInt(0, 59), 0);
+}
+function gpsOff(): number { return (Math.random() - 0.5) * 0.04; }
+
+const MOCKUP_USERS = [
+  { email: 'sale.bkk1@beautyup.com',    fullName: 'สมหญิง ใจดี',    bankName: 'กสิกรไทย',    bankAccount: '012-3-45678-9' },
+  { email: 'sale.bkk2@beautyup.com',    fullName: 'สมชาย วงษ์ดี',   bankName: 'กรุงเทพ',     bankAccount: '123-4-56789-0' },
+  { email: 'sale.central@beautyup.com', fullName: 'วิมล รักดี',      bankName: 'ไทยพาณิชย์',  bankAccount: '234-5-67890-1' },
+  { email: 'sale.north1@beautyup.com',  fullName: 'สมศรี แก้วใจ',   bankName: 'กรุงไทย',     bankAccount: '345-6-78901-2' },
+  { email: 'sale.north2@beautyup.com',  fullName: 'ธนกร ทองดี',      bankName: 'กสิกรไทย',    bankAccount: '456-7-89012-3' },
+  { email: 'sale.east@beautyup.com',    fullName: 'สุดา ยิ้มแย้ม',   bankName: 'ไทยพาณิชย์',  bankAccount: '567-8-90123-4' },
+  { email: 'sale.neast1@beautyup.com',  fullName: 'มานพ หมื่นดี',    bankName: 'กรุงเทพ',     bankAccount: '678-9-01234-5' },
+  { email: 'sale.neast2@beautyup.com',  fullName: 'สมพร พิมพ์ดี',   bankName: 'กรุงไทย',     bankAccount: '789-0-12345-6' },
+  { email: 'sale.neast3@beautyup.com',  fullName: 'ประสิทธิ์ นาดี',  bankName: 'กสิกรไทย',    bankAccount: '890-1-23456-7' },
+  { email: 'sale.south1@beautyup.com',  fullName: 'รัตนา ดวงใจ',    bankName: 'ไทยพาณิชย์',  bankAccount: '901-2-34567-8' },
+  { email: 'sale.south2@beautyup.com',  fullName: 'ชนิกา ศรีดี',    bankName: 'กรุงเทพ',     bankAccount: '012-3-45679-0' },
+];
+
+interface ProvMock { name: string; lat: number; lng: number; visits: number; email: string; districts?: string[] }
+
+const MOCKUP_PROVINCES: ProvMock[] = [
+  // bkk1
+  { name: 'กรุงเทพมหานคร',    lat: 13.7563, lng: 100.5018, visits: 25, email: 'sale.bkk1@beautyup.com',
+    districts: ['ลาดพร้าว','บางรัก','สาทร','ห้วยขวาง','คลองเตย','จตุจักร','บางนา','ดอนเมือง','ลาดกระบัง','มีนบุรี'] },
+  // bkk2
+  { name: 'นนทบุรี',          lat: 13.8621, lng: 100.5144, visits: 10, email: 'sale.bkk2@beautyup.com' },
+  { name: 'ปทุมธานี',         lat: 14.0208, lng: 100.5253, visits:  9, email: 'sale.bkk2@beautyup.com' },
+  { name: 'สมุทรปราการ',      lat: 13.5991, lng: 100.5998, visits:  9, email: 'sale.bkk2@beautyup.com' },
+  { name: 'นครปฐม',           lat: 13.8199, lng: 100.0621, visits:  6, email: 'sale.bkk2@beautyup.com' },
+  { name: 'สมุทรสาคร',        lat: 13.5475, lng: 100.2747, visits:  5, email: 'sale.bkk2@beautyup.com' },
+  { name: 'สมุทรสงคราม',      lat: 13.4098, lng: 100.0023, visits:  4, email: 'sale.bkk2@beautyup.com' },
+  // central
+  { name: 'พระนครศรีอยุธยา',  lat: 14.3692, lng: 100.5877, visits:  7, email: 'sale.central@beautyup.com' },
+  { name: 'ลพบุรี',            lat: 14.7995, lng: 100.6534, visits:  5, email: 'sale.central@beautyup.com' },
+  { name: 'สระบุรี',           lat: 14.5289, lng: 100.9100, visits:  5, email: 'sale.central@beautyup.com' },
+  { name: 'ชัยนาท',            lat: 15.1851, lng: 100.1253, visits:  3, email: 'sale.central@beautyup.com' },
+  { name: 'สิงห์บุรี',         lat: 14.8910, lng: 100.3969, visits:  3, email: 'sale.central@beautyup.com' },
+  { name: 'อ่างทอง',           lat: 14.5896, lng: 100.4553, visits:  3, email: 'sale.central@beautyup.com' },
+  { name: 'นครนายก',           lat: 14.2069, lng: 101.2130, visits:  3, email: 'sale.central@beautyup.com' },
+  { name: 'ปราจีนบุรี',        lat: 14.0524, lng: 101.3705, visits:  4, email: 'sale.central@beautyup.com' },
+  { name: 'สระแก้ว',           lat: 13.8240, lng: 102.0643, visits:  3, email: 'sale.central@beautyup.com' },
+  { name: 'สุพรรณบุรี',        lat: 14.4744, lng: 100.1177, visits:  5, email: 'sale.central@beautyup.com' },
+  { name: 'ราชบุรี',            lat: 13.5282, lng:  99.8134, visits:  6, email: 'sale.central@beautyup.com' },
+  { name: 'เพชรบุรี',           lat: 13.1119, lng:  99.9390, visits:  5, email: 'sale.central@beautyup.com' },
+  { name: 'ประจวบคีรีขันธ์',   lat: 11.8126, lng:  99.7974, visits:  4, email: 'sale.central@beautyup.com' },
+  // north1
+  { name: 'เชียงใหม่',         lat: 18.7883, lng:  98.9853, visits: 18, email: 'sale.north1@beautyup.com' },
+  { name: 'เชียงราย',          lat: 19.9105, lng:  99.8406, visits:  7, email: 'sale.north1@beautyup.com' },
+  { name: 'ลำพูน',             lat: 18.5745, lng:  99.0087, visits:  5, email: 'sale.north1@beautyup.com' },
+  { name: 'ลำปาง',             lat: 18.2888, lng:  99.4929, visits:  6, email: 'sale.north1@beautyup.com' },
+  { name: 'น่าน',               lat: 18.7756, lng: 100.7930, visits:  3, email: 'sale.north1@beautyup.com' },
+  { name: 'พะเยา',              lat: 19.1663, lng:  99.9009, visits:  3, email: 'sale.north1@beautyup.com' },
+  { name: 'แพร่',               lat: 18.1455, lng: 100.1406, visits:  4, email: 'sale.north1@beautyup.com' },
+  { name: 'แม่ฮ่องสอน',        lat: 19.3020, lng:  97.9654, visits:  2, email: 'sale.north1@beautyup.com' },
+  // north2
+  { name: 'พิษณุโลก',          lat: 16.8211, lng: 100.2659, visits:  8, email: 'sale.north2@beautyup.com' },
+  { name: 'ตาก',                lat: 16.8839, lng:  99.1258, visits:  4, email: 'sale.north2@beautyup.com' },
+  { name: 'สุโขทัย',           lat: 17.0071, lng:  99.8265, visits:  5, email: 'sale.north2@beautyup.com' },
+  { name: 'อุตรดิตถ์',         lat: 17.6200, lng: 100.0993, visits:  4, email: 'sale.north2@beautyup.com' },
+  { name: 'กำแพงเพชร',         lat: 16.4827, lng:  99.5226, visits:  4, email: 'sale.north2@beautyup.com' },
+  { name: 'พิจิตร',             lat: 16.4419, lng: 100.3491, visits:  3, email: 'sale.north2@beautyup.com' },
+  { name: 'เพชรบูรณ์',          lat: 16.4191, lng: 101.1591, visits:  5, email: 'sale.north2@beautyup.com' },
+  { name: 'นครสวรรค์',          lat: 15.7030, lng: 100.1373, visits:  6, email: 'sale.north2@beautyup.com' },
+  { name: 'อุทัยธานี',          lat: 15.3835, lng: 100.0255, visits:  3, email: 'sale.north2@beautyup.com' },
+  // east
+  { name: 'ชลบุรี',             lat: 13.3611, lng: 100.9847, visits: 16, email: 'sale.east@beautyup.com' },
+  { name: 'ระยอง',               lat: 12.6814, lng: 101.2816, visits:  7, email: 'sale.east@beautyup.com' },
+  { name: 'จันทบุรี',            lat: 12.6110, lng: 102.1040, visits:  4, email: 'sale.east@beautyup.com' },
+  { name: 'ตราด',                lat: 12.2427, lng: 102.5178, visits:  3, email: 'sale.east@beautyup.com' },
+  { name: 'ฉะเชิงเทรา',         lat: 13.6891, lng: 101.0783, visits:  5, email: 'sale.east@beautyup.com' },
+  { name: 'กาญจนบุรี',          lat: 14.0023, lng:  99.5328, visits:  5, email: 'sale.east@beautyup.com' },
+  // neast1
+  { name: 'ขอนแก่น',            lat: 16.4419, lng: 102.8360, visits: 14, email: 'sale.neast1@beautyup.com' },
+  { name: 'อุดรธานี',           lat: 17.4156, lng: 102.7872, visits: 12, email: 'sale.neast1@beautyup.com' },
+  { name: 'หนองคาย',            lat: 17.8783, lng: 102.7420, visits:  5, email: 'sale.neast1@beautyup.com' },
+  { name: 'หนองบัวลำภู',        lat: 17.2028, lng: 102.4430, visits:  4, email: 'sale.neast1@beautyup.com' },
+  { name: 'เลย',                 lat: 17.4860, lng: 101.7223, visits:  4, email: 'sale.neast1@beautyup.com' },
+  { name: 'บึงกาฬ',              lat: 18.3609, lng: 103.6466, visits:  3, email: 'sale.neast1@beautyup.com' },
+  // neast2
+  { name: 'สกลนคร',              lat: 17.1554, lng: 104.1348, visits:  5, email: 'sale.neast2@beautyup.com' },
+  { name: 'นครพนม',              lat: 17.3920, lng: 104.7793, visits:  4, email: 'sale.neast2@beautyup.com' },
+  { name: 'กาฬสินธุ์',           lat: 16.4336, lng: 103.5067, visits:  5, email: 'sale.neast2@beautyup.com' },
+  { name: 'มุกดาหาร',            lat: 16.5432, lng: 104.7236, visits:  3, email: 'sale.neast2@beautyup.com' },
+  { name: 'ร้อยเอ็ด',            lat: 16.0538, lng: 103.6520, visits:  6, email: 'sale.neast2@beautyup.com' },
+  { name: 'มหาสารคาม',           lat: 16.1851, lng: 103.3002, visits:  5, email: 'sale.neast2@beautyup.com' },
+  { name: 'ยโสธร',               lat: 15.7922, lng: 104.1452, visits:  3, email: 'sale.neast2@beautyup.com' },
+  { name: 'อำนาจเจริญ',          lat: 15.8656, lng: 104.6253, visits:  3, email: 'sale.neast2@beautyup.com' },
+  // neast3
+  { name: 'นครราชสีมา',          lat: 14.9799, lng: 102.0977, visits: 13, email: 'sale.neast3@beautyup.com' },
+  { name: 'บุรีรัมย์',            lat: 14.9951, lng: 103.1116, visits:  6, email: 'sale.neast3@beautyup.com' },
+  { name: 'สุรินทร์',             lat: 14.8824, lng: 103.4937, visits:  5, email: 'sale.neast3@beautyup.com' },
+  { name: 'ศรีสะเกษ',            lat: 15.1186, lng: 104.3222, visits:  5, email: 'sale.neast3@beautyup.com' },
+  { name: 'ชัยภูมิ',              lat: 15.8068, lng: 102.0318, visits:  5, email: 'sale.neast3@beautyup.com' },
+  { name: 'อุบลราชธานี',          lat: 15.2448, lng: 104.8473, visits:  7, email: 'sale.neast3@beautyup.com' },
+  // south1
+  { name: 'สุราษฎร์ธานี',        lat:  9.1382, lng:  99.3217, visits:  8, email: 'sale.south1@beautyup.com' },
+  { name: 'นครศรีธรรมราช',       lat:  8.4321, lng:  99.9633, visits:  7, email: 'sale.south1@beautyup.com' },
+  { name: 'ชุมพร',                lat: 10.4930, lng:  99.1800, visits:  4, email: 'sale.south1@beautyup.com' },
+  { name: 'ระนอง',                lat:  9.9529, lng:  98.6084, visits:  2, email: 'sale.south1@beautyup.com' },
+  { name: 'พังงา',                lat:  8.4509, lng:  98.5255, visits:  3, email: 'sale.south1@beautyup.com' },
+  { name: 'กระบี่',               lat:  8.0863, lng:  98.9063, visits:  5, email: 'sale.south1@beautyup.com' },
+  { name: 'ภูเก็ต',               lat:  7.9519, lng:  98.3381, visits: 11, email: 'sale.south1@beautyup.com' },
+  // south2
+  { name: 'สงขลา',                lat:  7.1756, lng: 100.6142, visits: 12, email: 'sale.south2@beautyup.com' },
+  { name: 'ตรัง',                 lat:  7.5645, lng:  99.6237, visits:  5, email: 'sale.south2@beautyup.com' },
+  { name: 'พัทลุง',               lat:  7.6167, lng: 100.0746, visits:  4, email: 'sale.south2@beautyup.com' },
+  { name: 'สตูล',                 lat:  6.6238, lng: 100.0674, visits:  3, email: 'sale.south2@beautyup.com' },
+  { name: 'ปัตตานี',              lat:  6.8685, lng: 101.2500, visits:  3, email: 'sale.south2@beautyup.com' },
+  { name: 'ยะลา',                 lat:  6.5418, lng: 101.2803, visits:  3, email: 'sale.south2@beautyup.com' },
+  { name: 'นราธิวาส',             lat:  6.4255, lng: 101.8253, visits:  3, email: 'sale.south2@beautyup.com' },
+];
+
+async function seedMockupJune2026() {
+  console.log('\n── Mockup June 2026 ─────────────────────────────');
+  const hash = await bcrypt.hash('sale1234', 10);
+  const userMap: Record<string, string> = {};
+  const userRole = await prisma.role.findFirst({ where: { name: 'user' } });
+
+  for (const u of MOCKUP_USERS) {
+    const user = await prisma.user.upsert({
+      where:  { email: u.email },
+      update: { fullName: u.fullName, bankName: u.bankName, bankAccount: u.bankAccount },
+      create: { email: u.email, passwordHash: hash, fullName: u.fullName,
+                role: 'user', roleId: userRole?.id ?? null,
+                bankName: u.bankName, bankAccount: u.bankAccount },
+    });
+    userMap[u.email] = user.id;
+    console.log(`  user: ${u.fullName.padEnd(18)} ${u.email}`);
+  }
+
+  const userIds = Object.values(userMap);
+  const cleared = await prisma.visitRecord.deleteMany({
+    where: { userId: { in: userIds },
+             createdAt: { gte: new Date(2026, 5, 1), lte: new Date(2026, 5, 30, 23, 59, 59) } },
+  });
+  if (cleared.count > 0) console.log(`  cleared ${cleared.count} existing June 2026 visits`);
+
+  const rows: any[] = [];
+  let txn = 1;
+
+  for (const p of MOCKUP_PROVINCES) {
+    const userId = userMap[p.email];
+    if (!userId) continue;
+    for (let i = 0; i < p.visits; i++) {
+      const result      = rand(RESULTS);
+      const isBuy       = result === 'buy';
+      const orderAmount = isBuy ? randInt(5, 150) * 100 : null;
+      const slipStatus  = isBuy ? rand(SLIP_STATUSES) : null;
+      rows.push({
+        userId,
+        shopName:     rand(SHOP_NAMES),
+        province:     p.name,
+        district:     p.districts ? rand(p.districts) : null,
+        latitude:     p.lat + gpsOff(),
+        longitude:    p.lng + gpsOff(),
+        tripType:     rand(TRIP_TYPES),
+        customerType: rand(CUSTOMER_TYPES),
+        visitType:    rand(VISIT_TYPES),
+        result,
+        details:      isBuy ? 'ลูกค้าสนใจสินค้า พร้อมสั่งซื้อ' : '',
+        orderAmount,
+        imageUrls:    [],
+        slipStatus,
+        transRef:     isBuy ? `TXN2606${String(txn++).padStart(4, '0')}` : null,
+        createdAt:    juneDate(),
+      });
+    }
+  }
+
+  await prisma.visitRecord.createMany({ data: rows });
+  const buy = rows.filter((r) => r.result === 'buy').length;
+  console.log(`  created ${rows.length} visits — ซื้อ ${buy} / ไม่ซื้อ ${rows.filter(r=>r.result==='no_buy').length} / ไม่พบ ${rows.filter(r=>r.result==='not_found').length}`);
+  console.log(`  77 provinces, 11 sales users, password: sale1234`);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('Seeding...\n');
@@ -184,6 +366,9 @@ async function main() {
   }
 
   console.log(`\nDone — ${total} visit records, ${ROLES.length} roles, ${USERS.length} users`);
+
+  // 4. Mockup June 2026 — 77 provinces, 11 sales users
+  await seedMockupJune2026();
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
