@@ -319,6 +319,89 @@ async function seedMockupJune2026() {
   console.log(`  77 provinces, 11 sales users, password: sale1234`);
 }
 
+// ── July 2026 Mockup — เยอะๆ เพื่อดูหน้าจ่ายค่าคอม ──────────────────────────
+const JULY_WORKDAYS: number[] = [];
+for (let d = 1; d <= 31; d++) {
+  const day = new Date(2026, 6, d).getDay();
+  if (day !== 0 && day !== 6) JULY_WORKDAYS.push(d);
+}
+function julyDate(): Date {
+  const day = rand(JULY_WORKDAYS);
+  return new Date(2026, 6, day, randInt(8, 17), randInt(0, 59), 0);
+}
+// buy เยอะ, slip ทุกใบเป็น verified/approved (นับ commission ได้)
+const JULY_RESULTS      = ['buy','buy','buy','buy','buy','buy','buy','no_buy','not_found','not_found'] as const;
+const JULY_SLIP_CONFIRM = ['verified', 'verified', 'verified', 'approved'] as const;
+
+async function seedMockupJuly2026() {
+  console.log('\n── Mockup July 2026 ─────────────────────────────');
+
+  // upsert commission settings (rate 3%, threshold 30,000 บาท)
+  await prisma.setting.upsert({
+    where:  { key: 'commission_rate' },
+    update: { value: '3' },
+    create: { key: 'commission_rate', value: '3' },
+  });
+  await prisma.setting.upsert({
+    where:  { key: 'commission_threshold' },
+    update: { value: '30000' },
+    create: { key: 'commission_threshold', value: '30000' },
+  });
+  console.log('  commission_rate=3%, threshold=฿30,000');
+
+  const userMap: Record<string, string> = {};
+  for (const u of MOCKUP_USERS) {
+    const user = await prisma.user.findUnique({ where: { email: u.email } });
+    if (user) userMap[u.email] = user.id;
+  }
+  const userIds = Object.values(userMap);
+  if (!userIds.length) { console.log('  ไม่พบ mockup users — รัน seedMockupJune2026 ก่อน'); return; }
+
+  const cleared = await prisma.visitRecord.deleteMany({
+    where: { userId: { in: userIds },
+             createdAt: { gte: new Date(2026, 6, 1), lte: new Date(2026, 6, 31, 23, 59, 59) } },
+  });
+  if (cleared.count > 0) console.log(`  cleared ${cleared.count} existing July 2026 visits`);
+
+  const rows: any[] = [];
+  let txn = 1;
+
+  for (const p of MOCKUP_PROVINCES) {
+    const userId = userMap[p.email];
+    if (!userId) continue;
+    const visits = Math.ceil(p.visits * 1.4);
+    for (let i = 0; i < visits; i++) {
+      const result      = rand(JULY_RESULTS);
+      const isBuy       = result === 'buy';
+      const orderAmount = isBuy ? randInt(15, 400) * 100 : null;
+      rows.push({
+        userId,
+        shopName:     rand(SHOP_NAMES),
+        province:     p.name,
+        district:     p.districts ? rand(p.districts) : null,
+        latitude:     p.lat + gpsOff(),
+        longitude:    p.lng + gpsOff(),
+        tripType:     rand(TRIP_TYPES),
+        customerType: rand(CUSTOMER_TYPES),
+        visitType:    rand(VISIT_TYPES),
+        result,
+        details:      isBuy ? 'ลูกค้าสนใจสินค้า พร้อมสั่งซื้อ' : '',
+        orderAmount,
+        imageUrls:    [`https://picsum.photos/400/300?random=${500 + txn}`],
+        slipStatus:   isBuy ? rand(JULY_SLIP_CONFIRM) : null,
+        transRef:     isBuy ? `TXN2607${String(txn++).padStart(4, '0')}` : null,
+        createdAt:    julyDate(),
+      });
+    }
+  }
+
+  await prisma.visitRecord.createMany({ data: rows });
+  const buy = rows.filter((r) => r.result === 'buy').length;
+  const totalAmt = rows.reduce((s, r) => s + (r.orderAmount ?? 0), 0);
+  console.log(`  created ${rows.length} visits — ซื้อ ${buy} / ไม่ซื้อ ${rows.filter(r=>r.result==='no_buy').length} / ไม่พบ ${rows.filter(r=>r.result==='not_found').length}`);
+  console.log(`  ยอดขายรวม ฿${totalAmt.toLocaleString('th-TH')}`);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('Seeding...\n');
@@ -369,6 +452,9 @@ async function main() {
 
   // 4. Mockup June 2026 — 77 provinces, 11 sales users
   await seedMockupJune2026();
+
+  // 5. Mockup July 2026 — buy เยอะ + commission settings
+  await seedMockupJuly2026();
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
