@@ -141,7 +141,7 @@ export class VisitsController {
       userId: req.user.id,
       role: req.user.role,
       page: q.page ? parseInt(q.page) : 1,
-      limit: q.limit ? parseInt(q.limit) : 20,
+      limit: q.limit ? parseInt(q.limit) : 100,
       province: q.province,
       result: q.result,
       tripType: q.tripType,
