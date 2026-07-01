@@ -91,24 +91,35 @@ export class VisitsService {
       ? `https://maps.google.com/?q=${params.latitude},${params.longitude}`
       : '';
     try {
-      await this.googleService.ensureSheetHeader();
-      await this.googleService.appendVisitRow([
-        now,                                                    // ประทับเวลา
-        params.userEmail,                                       // ที่อยู่อีเมล
-        params.tripType ? tripMap[params.tripType] : '',        // ทริป
-        params.visitType ? missionMap[params.visitType] : '',   // ภารกิจ
-        customerLabel,                                          // ลูกค้า
-        params.shopName,                                        // ชื่อร้าน
-        mapsUrl,                                                // Link Google Maps
-        params.province,                                        // จังหวัด
-        params.district || '',                                  // (*สำหรับกทม.*)
-        params.result ? resultMap[params.result] : '',          // ผลตอบรับ
-        slotUrls['line'] || '',                                 // Line OA (1 รูป)
-        slotUrls['front1'] || '',                               // รูปหน้าร้าน (1รูป)
-        slotUrls['inside1'] || '',                              // รูปในร้าน (1รูป)
-        params.details || '',                                   // สรุปผล
-        slotUrls['xray'] || '',                                 // ใบ X-Ray ส่ง (1รูป)
-      ]);
+      const visitSheetSetting = await this.prisma.setting.findUnique({ where: { key: 'visit_sheet_id' } });
+      const visitSheetId = visitSheetSetting?.value || process.env.GOOGLE_SHEET_ID || '';
+      if (!visitSheetId) throw new Error('visit_sheet_id not configured');
+      await this.googleService.appendToSheetById(
+        visitSheetId,
+        [
+          now,
+          params.userEmail,
+          params.tripType ? tripMap[params.tripType] : '',
+          params.visitType ? missionMap[params.visitType] : '',
+          customerLabel,
+          params.shopName,
+          mapsUrl,
+          params.province,
+          params.district || '',
+          params.result ? resultMap[params.result] : '',
+          slotUrls['line'] || '',
+          slotUrls['front1'] || '',
+          slotUrls['inside1'] || '',
+          params.details || '',
+          slotUrls['xray'] || '',
+        ],
+        [
+          'ประทับเวลา', 'ที่อยู่อีเมล', 'ทริป', 'ภารกิจ', 'ลูกค้า',
+          'ชื่อร้าน', 'Link Google Maps', 'จังหวัด', '(*สำหรับกทม.)',
+          'ผลตอบรับ', 'Line OA (1 รูป)', 'รูปหน้าร้าน (1รูป)', 'รูปในร้าน (1รูป)',
+          'สรุปผล', 'ใบ X-Ray ส่ง (1รูป)',
+        ],
+      );
     } catch (e) {
       this.logger.warn(`Google Sheets append failed: ${e.message} | status=${e.status ?? e.code} | errors=${JSON.stringify(e.errors ?? e.response?.data ?? '-')}`);
     }
