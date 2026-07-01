@@ -110,7 +110,7 @@ export class VisitsService {
         slotUrls['xray'] || '',                                 // ใบ X-Ray ส่ง (1รูป)
       ]);
     } catch (e) {
-      this.logger.warn(`Google Sheets append failed: ${e.message}`);
+      this.logger.warn(`Google Sheets append failed: ${e.message} | status=${e.status ?? e.code} | errors=${JSON.stringify(e.errors ?? e.response?.data ?? '-')}`);
     }
 
     // Log to commission sheet if QR-verified slip (no admin approval needed)
