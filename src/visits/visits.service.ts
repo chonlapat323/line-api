@@ -93,6 +93,7 @@ export class VisitsService {
     try {
       const visitSheetSetting = await this.prisma.setting.findUnique({ where: { key: 'visit_sheet_id' } });
       const visitSheetId = visitSheetSetting?.value || process.env.GOOGLE_SHEET_ID || '';
+      this.logger.log(`Google Sheets: using visit_sheet_id="${visitSheetId}" (from ${visitSheetSetting?.value ? 'DB' : 'env'})`);
       if (!visitSheetId) throw new Error('visit_sheet_id not configured');
       await this.googleService.appendToSheetById(
         visitSheetId,
