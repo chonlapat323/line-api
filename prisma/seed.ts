@@ -305,7 +305,7 @@ async function seedMockupJune2026() {
         result,
         details:      isBuy ? 'ลูกค้าสนใจสินค้า พร้อมสั่งซื้อ' : '',
         orderAmount,
-        imageUrls:    [],
+        imageUrls:    [`https://picsum.photos/400/300?random=${txn}`],
         slipStatus,
         transRef:     isBuy ? `TXN2606${String(txn++).padStart(4, '0')}` : null,
         createdAt:    juneDate(),
