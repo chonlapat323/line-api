@@ -1,6 +1,9 @@
 {
   "name": "line-sender-api",
   "version": "1.0.0",
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
+  },
   "scripts": {
     "build": "nest build",
     "start": "node dist/main",
