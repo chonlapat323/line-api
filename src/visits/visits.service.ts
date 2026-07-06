@@ -151,10 +151,10 @@ export class VisitsService {
       }
     }
 
-    // Send to LINE Group (exclude quotation image — for internal record only)
+    // Send to LINE Group
     const lineResult = await this.lineService.sendToGroups({
       senderId: params.userId,
-      files: params.files.filter((f) => !f.originalname.startsWith('quotation-')),
+      files: params.files,
       targetUserIds: [params.userId],
       title: params.shopName,
       price: params.result === 'buy' && params.orderAmount != null
