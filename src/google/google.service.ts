@@ -80,15 +80,12 @@ export class GoogleService {
     const auth = this.getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    this.logger.log(`Sheets step 1: getSheetTitle id=${sheetId}`);
     const title = await this.getSheetTitleById(sheetId);
-    this.logger.log(`Sheets step 2: got title="${title}", checking A1`);
 
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: `'${title}'!A1`,
     });
-    this.logger.log(`Sheets step 3: A1 hasHeader=${!!existing.data.values?.length}, appending row`);
 
     if (!existing.data.values?.length) {
       await sheets.spreadsheets.values.update({
@@ -105,7 +102,6 @@ export class GoogleService {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
     });
-    this.logger.log(`Sheets step 4: append success`);
   }
 
   async ensureSheetHeader(): Promise<void> {
