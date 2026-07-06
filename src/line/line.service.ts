@@ -94,6 +94,7 @@ export class LineService {
           aspectMode: 'cover',
           aspectRatio: '1:1',
           animated: false,
+          action: { type: 'uri', uri: url },
         })),
       });
     }
@@ -110,11 +111,23 @@ export class LineService {
     const { imageUrls, title, price, note, senderName } = data;
     const isSingle = imageUrls.length === 1;
 
+    const copyText = [title, price ? `ยอด: ${price}` : '', note, `โดย: ${senderName}`].filter(Boolean).join('\n');
+
     const infoContents: any[] = [
       { type: 'text', text: title, weight: 'bold', size: 'lg', wrap: true },
       ...(price ? [{ type: 'text', text: `ยอด: ${price}`, size: 'md', color: '#e63c3c' }] : []),
       ...(note ? [{ type: 'text', text: note, size: 'sm', color: '#666666', wrap: true }] : []),
       { type: 'text', text: `โดย: ${senderName}`, size: 'xs', color: '#aaaaaa' },
+      {
+        type: 'button',
+        action: { type: 'clipboard', clipboardText: copyText },
+        style: 'link',
+        height: 'sm',
+        color: '#aaaaaa',
+        contents: { type: 'box', layout: 'horizontal', spacing: 'xs', contents: [
+          { type: 'text', text: 'คัดลอกข้อความ', size: 'xs', color: '#aaaaaa' },
+        ]},
+      },
     ];
 
     // Single image → hero (large) + info below
@@ -130,6 +143,7 @@ export class LineService {
             size: 'full',
             aspectRatio: '4:3',
             aspectMode: 'cover',
+            action: { type: 'uri', uri: imageUrls[0] },
           },
           body: {
             type: 'box',
