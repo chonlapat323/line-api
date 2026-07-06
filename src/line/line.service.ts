@@ -120,13 +120,10 @@ export class LineService {
       { type: 'text', text: `โดย: ${senderName}`, size: 'xs', color: '#aaaaaa' },
       {
         type: 'button',
-        action: { type: 'clipboard', clipboardText: copyText },
+        action: { type: 'clipboard', label: 'คัดลอกข้อความ', clipboardText: copyText },
         style: 'link',
         height: 'sm',
         color: '#aaaaaa',
-        contents: { type: 'box', layout: 'horizontal', spacing: 'xs', contents: [
-          { type: 'text', text: 'คัดลอกข้อความ', size: 'xs', color: '#aaaaaa' },
-        ]},
       },
     ];
 
