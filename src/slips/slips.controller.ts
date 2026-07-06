@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { SlipsService } from './slips.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -33,8 +33,17 @@ export class SlipsController {
   }
 
   @Get()
-  findAll(@Request() req) {
-    return this.slipsService.findAll(req.user.id, req.user.role);
+  findAll(@Request() req, @Query() q: any) {
+    return this.slipsService.findAll({
+      userId: req.user.id,
+      role: req.user.role,
+      status: q.status,
+      search: q.search,
+      dateFrom: q.dateFrom,
+      dateTo: q.dateTo,
+      page: q.page ? parseInt(q.page) : 1,
+      limit: q.limit ? parseInt(q.limit) : 20,
+    });
   }
 
   @Patch(':id/approve')
