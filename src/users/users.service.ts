@@ -24,12 +24,12 @@ export class UsersService {
         id: true, email: true, fullName: true, role: true, roleId: true,
         bankName: true, bankAccount: true,
         roleRef: { select: { label: true } },
-        userLineGroups: { where: { isActive: true }, select: { id: true }, take: 1 },
+        lineGroups: { where: { isActive: true }, select: { id: true }, take: 1 },
       },
     });
     if (!user) return null;
-    const { userLineGroups, ...rest } = user;
-    return { ...rest, lineConnected: userLineGroups.length > 0 };
+    const { lineGroups, ...rest } = user;
+    return { ...rest, lineConnected: lineGroups.length > 0 };
   }
 
   async updateUser(id: string, data: { fullName?: string; email?: string; role?: string; roleId?: string | null; password?: string; bankName?: string; bankAccount?: string }) {
