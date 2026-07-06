@@ -157,7 +157,9 @@ export class VisitsService {
       files: params.files,
       targetUserIds: [params.userId],
       title: params.shopName,
-      price: '',
+      price: params.result === 'buy' && params.orderAmount != null
+        ? `฿${params.orderAmount.toLocaleString('th-TH')}`
+        : '',
       note: noteParts,
     });
 
