@@ -112,7 +112,7 @@ export class LineService {
 
     const infoContents: any[] = [
       { type: 'text', text: title, weight: 'bold', size: 'lg', wrap: true },
-      ...(price ? [{ type: 'text', text: `ราคา: ${price}`, size: 'md', color: '#e63c3c' }] : []),
+      ...(price ? [{ type: 'text', text: `ยอด: ${price}`, size: 'md', color: '#e63c3c' }] : []),
       ...(note ? [{ type: 'text', text: note, size: 'sm', color: '#666666', wrap: true }] : []),
       { type: 'text', text: `โดย: ${senderName}`, size: 'xs', color: '#aaaaaa' },
     ];
