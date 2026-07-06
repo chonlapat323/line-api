@@ -72,6 +72,7 @@ export class SlipsService {
   async findAll(params: {
     userId: string;
     role: string;
+    filterUserId?: string;
     status?: string;
     search?: string;
     dateFrom?: string;
@@ -83,6 +84,7 @@ export class SlipsService {
     const skip = (page - 1) * limit;
 
     const where: any = role !== 'admin' ? { userId } : {};
+    if (params.filterUserId) where.userId = params.filterUserId;
     if (params.status) where.slipStatus = params.status;
     if (params.search) {
       where.OR = [
