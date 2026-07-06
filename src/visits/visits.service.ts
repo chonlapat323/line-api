@@ -279,13 +279,14 @@ export class VisitsService {
         },
       }),
       this.prisma.setting.findMany({
-        where: { key: { in: ['commission_rate', 'commission_threshold'] } },
+        where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
     ]);
 
-    const settingMap = Object.fromEntries(settings.map((s) => [s.key, parseFloat(s.value || '0')]));
-    const rate = settingMap['commission_rate'] ?? 0;
-    const threshold = settingMap['commission_threshold'] ?? 0;
+    const settingMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
+    const rate = parseFloat(settingMap['commission_rate'] || '0');
+    const threshold = parseFloat(settingMap['commission_threshold'] || '0');
+    const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
 
     const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number }>();
     for (const visit of visits) {
@@ -303,12 +304,12 @@ export class VisitsService {
 
     const summary = Array.from(userMap.values())
       .map(({ user, count, totalAmount, pendingCount }) => {
-        const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold });
+        const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
         return { userId: user.id, user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount }, visitCount: count, totalAmount, reachedThreshold, commission, pendingCount };
       })
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
-    return { month, settings: { rate, threshold }, summary };
+    return { month, settings: { rate, threshold, tiers }, summary };
   }
 
   async getMyCommission(userId: string, month: string) {
@@ -326,21 +327,22 @@ export class VisitsService {
         select: { id: true, shopName: true, orderAmount: true, slipStatus: true, createdAt: true },
       }),
       this.prisma.setting.findMany({
-        where: { key: { in: ['commission_rate', 'commission_threshold'] } },
+        where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
     ]);
 
-    const settingMap = Object.fromEntries(settings.map((s) => [s.key, parseFloat(s.value || '0')]));
-    const rate = settingMap['commission_rate'] ?? 0;
-    const threshold = settingMap['commission_threshold'] ?? 0;
+    const settingMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
+    const rate = parseFloat(settingMap['commission_rate'] || '0');
+    const threshold = parseFloat(settingMap['commission_threshold'] || '0');
+    const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
 
     const { confirmed: confirmedVisits, pending: pendingVisits, totalAmount, pendingAmount } = classifyVisits(visits);
-    const { reachedThreshold, commission, remaining } = calculateCommission({ totalAmount, rate, threshold });
+    const { reachedThreshold, commission, remaining, breakdown } = calculateCommission({ totalAmount, rate, threshold, tiers });
 
     return {
       month, visitCount: visits.length, totalAmount, pendingAmount,
       confirmedCount: confirmedVisits.length, pendingCount: pendingVisits.length,
-      reachedThreshold, commission, remaining, settings: { rate, threshold },
+      reachedThreshold, commission, remaining, breakdown, settings: { rate, threshold, tiers },
     };
   }
 

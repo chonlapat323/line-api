@@ -1,20 +1,53 @@
+export interface CommissionTier {
+  min: number;
+  max: number | null;
+  rate: number;
+}
+
+export interface TierBreakdown {
+  min: number;
+  max: number | null;
+  rate: number;
+  amount: number;
+  commission: number;
+}
+
 export interface CommissionInput {
   totalAmount: number;
-  rate: number;       // เปอร์เซ็นต์ เช่น 3 = 3%
-  threshold: number;  // ยอดขั้นต่ำที่ต้องถึง
+  rate: number;
+  threshold: number;
+  tiers?: CommissionTier[];
 }
 
 export interface CommissionResult {
   reachedThreshold: boolean;
   commission: number;
   remaining: number;
+  breakdown?: TierBreakdown[];
 }
 
-export function calculateCommission({ totalAmount, rate, threshold }: CommissionInput): CommissionResult {
+export function calculateCommission({ totalAmount, rate, threshold, tiers }: CommissionInput): CommissionResult {
   const reachedThreshold = threshold === 0 || totalAmount >= threshold;
-  const commission = reachedThreshold ? Math.round(totalAmount * rate) / 100 : 0;
-  const remaining = reachedThreshold ? 0 : threshold - totalAmount;
-  return { reachedThreshold, commission, remaining };
+  if (!reachedThreshold) {
+    return { reachedThreshold: false, commission: 0, remaining: threshold - totalAmount };
+  }
+
+  if (tiers && tiers.length > 0) {
+    let totalCommission = 0;
+    const breakdown: TierBreakdown[] = [];
+    for (const tier of tiers) {
+      const tierMax = tier.max ?? Infinity;
+      if (totalAmount <= tier.min) break;
+      const amountInTier = Math.min(totalAmount, tierMax) - tier.min;
+      const commissionInTier = Math.round(amountInTier * tier.rate) / 100;
+      totalCommission += commissionInTier;
+      breakdown.push({ min: tier.min, max: tier.max, rate: tier.rate, amount: amountInTier, commission: commissionInTier });
+    }
+    return { reachedThreshold: true, commission: totalCommission, remaining: 0, breakdown };
+  }
+
+  const commission = Math.round(totalAmount * rate) / 100;
+  return { reachedThreshold: true, commission, remaining: 0 };
 }
 
 export type VisitForCommission = {

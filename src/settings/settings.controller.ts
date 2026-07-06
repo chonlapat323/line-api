@@ -46,9 +46,11 @@ export class SettingsController {
   async getCommissionSettings() {
     const rate = await this.settingsService.get('commission_rate');
     const threshold = await this.settingsService.get('commission_threshold');
+    const tiersRaw = await this.settingsService.get('commission_tiers');
     return {
       rate: parseFloat(rate || '0'),
       threshold: parseFloat(threshold || '0'),
+      tiers: tiersRaw ? JSON.parse(tiersRaw) : [],
     };
   }
 
@@ -56,10 +58,11 @@ export class SettingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles({ menu: 'settings', action: 'canEdit' })
   async updateCommissionSettings(
-    @Body() body: { rate?: number; threshold?: number },
+    @Body() body: { rate?: number; threshold?: number; tiers?: any[] },
   ) {
     if (body.rate != null) await this.settingsService.set('commission_rate', String(body.rate));
     if (body.threshold != null) await this.settingsService.set('commission_threshold', String(body.threshold));
+    if (body.tiers != null) await this.settingsService.set('commission_tiers', JSON.stringify(body.tiers));
     return { ok: true };
   }
 
