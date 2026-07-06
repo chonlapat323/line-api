@@ -31,7 +31,7 @@ export class VisitsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FilesInterceptor('images', 6, { storage: visitStorage }))
+  @UseInterceptors(FilesInterceptor('images', 7, { storage: visitStorage }))
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() body: any,

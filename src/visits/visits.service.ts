@@ -78,7 +78,7 @@ export class VisitsService {
     ].filter(Boolean).join(' · ');
 
     // Map server image URLs by slot key for Sheet
-    const slotKeys = ['front1', 'front2', 'inside1', 'inside2', 'line', 'xray'];
+    const slotKeys = ['front1', 'front2', 'inside1', 'inside2', 'line', 'xray', 'quotation'];
     const slotUrls: Record<string, string> = {};
     for (const file of params.files) {
       const slotKey = slotKeys.find((k) => file.originalname.startsWith(k + '-'));
