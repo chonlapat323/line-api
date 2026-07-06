@@ -186,21 +186,17 @@ export class LineService {
     };
   }
 
-  async sendToGroups(params: {
+  private async pushToGroups(params: {
     senderId: string;
-    files: Express.Multer.File[];
+    imageUrls: string[];
     targetUserIds: string[];
     title: string;
     price: string;
     note: string;
+    senderName: string;
   }) {
-    const appUrl = process.env.APP_URL || 'http://localhost:3001';
-    const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
+    const { imageUrls, senderName } = params;
     const primaryImageUrl = imageUrls[0];
-
-    const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
-    if (!sender) return { error: 'ไม่พบผู้ใช้' };
-
     const client = this.getClient();
     const results = [];
 
@@ -209,7 +205,7 @@ export class LineService {
       title: params.title,
       price: params.price,
       note: params.note,
-      senderName: sender.fullName,
+      senderName,
     });
 
     for (const targetUserId of params.targetUserIds) {
@@ -231,13 +227,7 @@ export class LineService {
               targetUserId,
               lineGroupId: group.lineGroupId,
               imageUrl: primaryImageUrl,
-              details: {
-                title: params.title,
-                price: params.price,
-                note: params.note,
-                imageUrls,
-                imageCount: imageUrls.length,
-              },
+              details: { title: params.title, price: params.price, note: params.note, imageUrls, imageCount: imageUrls.length },
               status: 'success',
             },
           });
@@ -251,13 +241,7 @@ export class LineService {
               targetUserId,
               lineGroupId: group.lineGroupId,
               imageUrl: primaryImageUrl,
-              details: {
-                title: params.title,
-                price: params.price,
-                note: params.note,
-                imageUrls,
-                imageCount: imageUrls.length,
-              },
+              details: { title: params.title, price: params.price, note: params.note, imageUrls, imageCount: imageUrls.length },
               status: 'failed',
               errorMessage,
             },
@@ -268,6 +252,34 @@ export class LineService {
     }
 
     return { results };
+  }
+
+  async sendToGroups(params: {
+    senderId: string;
+    files: Express.Multer.File[];
+    targetUserIds: string[];
+    title: string;
+    price: string;
+    note: string;
+  }) {
+    const appUrl = process.env.APP_URL || 'http://localhost:3001';
+    const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
+    const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
+    if (!sender) return { error: 'ไม่พบผู้ใช้' };
+    return this.pushToGroups({ ...params, imageUrls, senderName: sender.fullName });
+  }
+
+  async sendToGroupsWithUrls(params: {
+    senderId: string;
+    imageUrls: string[];
+    targetUserIds: string[];
+    title: string;
+    price: string;
+    note: string;
+  }) {
+    const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
+    if (!sender) return { error: 'ไม่พบผู้ใช้' };
+    return this.pushToGroups({ ...params, senderName: sender.fullName });
   }
 
   async getHistory(userId: string, role: string) {

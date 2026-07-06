@@ -40,6 +40,8 @@ model User {
   visitRecords        VisitRecord[]
   commissionsPaid     CommissionPayment[]   @relation("CommissionPaid")
   commissionsPaidBy   CommissionPayment[]   @relation("CommissionPaidBy")
+  slipSubmissions     SlipSubmission[]      @relation("SlipSubmissions")
+  approvedSlips       SlipSubmission[]      @relation("SlipApprovals")
 }
 
 model UserLineGroup {
@@ -101,6 +103,24 @@ model CommissionPayment {
   admin User @relation("CommissionPaidBy", fields: [paidBy], references: [id])
 
   @@unique([userId, month])
+}
+
+model SlipSubmission {
+  id          String    @id @default(cuid())
+  userId      String
+  shopName    String
+  amount      Float?
+  details     String?
+  slipUrl     String
+  slipStatus  String    // "verified" | "pending_approval" | "approved" | "rejected"
+  transRef    String?
+  lineStatus  String?   // "sent" | "failed"
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user     User  @relation("SlipSubmissions", fields: [userId], references: [id])
+  approver User? @relation("SlipApprovals", fields: [approvedBy], references: [id])
 }
 
 model VisitRecord {
