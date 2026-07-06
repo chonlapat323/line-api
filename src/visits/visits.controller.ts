@@ -67,7 +67,7 @@ export class VisitsController {
       return { success: false, raw: { error: 'no file uploaded' } };
     }
 
-    this.logger.log(`verify-slip: file=${file.originalname} size=${file.size} mime=${file.mimetype}`);
+    this.logger.log(`[verify-slip] received: file=${file.originalname} size=${file.size}B (${Math.round(file.size/1024)}KB) mime=${file.mimetype}`);
 
     const result = await this.slipService.verify(file.buffer, file.originalname);
 

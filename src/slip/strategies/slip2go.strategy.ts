@@ -19,8 +19,9 @@ export class Slip2GoStrategy implements ISlipStrategy {
 
     const mime = filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
     const imageBase64 = `data:${mime};base64,${imageBuffer.toString('base64')}`;
+    const base64Kb = Math.round(imageBase64.length / 1024);
 
-    this.logger.log(`Verifying slip: ${filename} (${imageBuffer.length} bytes)`);
+    this.logger.log(`[Slip2Go] verify start: file=${filename} buffer=${imageBuffer.length}B base64=${base64Kb}KB`);
 
     try {
       const { data: res, status } = await axios.post(
@@ -31,18 +32,19 @@ export class Slip2GoStrategy implements ISlipStrategy {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${secret}`,
           },
+          timeout: 15000,
         },
       );
 
-      this.logger.log(`Slip2Go HTTP ${status} code=${res?.code} hasData=${!!res?.data}`);
+      this.logger.log(`[Slip2Go] HTTP ${status} | code=${res?.code} | message=${res?.message ?? '-'} | hasData=${!!res?.data}`);
 
       if (res.code !== '200000' || !res.data) {
-        this.logger.warn(`Slip2Go no QR: code=${res.code} message=${res.message ?? '-'}`);
+        this.logger.warn(`[Slip2Go] no QR found | code=${res.code} | message=${res.message ?? '-'} | raw=${JSON.stringify(res).slice(0, 500)}`);
         return { success: false, raw: res };
       }
 
       const d = res.data;
-      this.logger.log(`Slip2Go QR ok: transRef=${d.transRef} amount=${d.amount}`);
+      this.logger.log(`[Slip2Go] QR ok | transRef=${d.transRef} | amount=${d.amount} | sender=${d.sender?.account?.name ?? '-'}`);
       return {
         success: true,
         amount: d.amount,
@@ -57,7 +59,7 @@ export class Slip2GoStrategy implements ISlipStrategy {
     } catch (err: any) {
       const status = err?.response?.status;
       const errData = err?.response?.data ?? err?.message;
-      this.logger.error(`Slip2Go failed: HTTP ${status ?? '?'} body=${JSON.stringify(errData)?.slice(0, 300)}`);
+      this.logger.error(`[Slip2Go] request failed | HTTP ${status ?? '?'} | body=${JSON.stringify(errData).slice(0, 500)}`);
       return { success: false, raw: errData };
     }
   }
