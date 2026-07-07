@@ -38,10 +38,12 @@ model User {
   sentLogs            LineSendLog[]         @relation("SenderLogs")
   receivedLogs        LineSendLog[]         @relation("TargetLogs")
   visitRecords        VisitRecord[]
-  commissionsPaid     CommissionPayment[]   @relation("CommissionPaid")
-  commissionsPaidBy   CommissionPayment[]   @relation("CommissionPaidBy")
-  slipSubmissions     SlipSubmission[]      @relation("SlipSubmissions")
-  approvedSlips       SlipSubmission[]      @relation("SlipApprovals")
+  commissionsPaid        CommissionPayment[]      @relation("CommissionPaid")
+  commissionsPaidBy      CommissionPayment[]      @relation("CommissionPaidBy")
+  slipSubmissions        SlipSubmission[]         @relation("SlipSubmissions")
+  approvedSlips          SlipSubmission[]         @relation("SlipApprovals")
+  commissionAdjustments  CommissionAdjustment[]   @relation("AdjustmentUser")
+  adjustmentsCreated     CommissionAdjustment[]   @relation("AdjustmentCreatedBy")
 }
 
 model UserLineGroup {
@@ -121,6 +123,19 @@ model SlipSubmission {
 
   user     User  @relation("SlipSubmissions", fields: [userId], references: [id])
   approver User? @relation("SlipApprovals", fields: [approvedBy], references: [id])
+}
+
+model CommissionAdjustment {
+  id        String   @id @default(cuid())
+  userId    String
+  month     String
+  amount    Float
+  note      String?
+  createdBy String
+  createdAt DateTime @default(now())
+
+  user  User @relation("AdjustmentUser",     fields: [userId],    references: [id])
+  admin User @relation("AdjustmentCreatedBy", fields: [createdBy], references: [id])
 }
 
 model VisitRecord {

@@ -261,7 +261,7 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [visits, settings] = await Promise.all([
+    const [visits, settings, adjustments] = await Promise.all([
       this.prisma.visitRecord.findMany({
         where: {
           result: 'buy',
@@ -281,12 +281,22 @@ export class VisitsService {
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
+      this.prisma.commissionAdjustment.findMany({
+        where: { month },
+        select: { userId: true, amount: true, note: true },
+      }),
     ]);
 
     const settingMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
     const rate = parseFloat(settingMap['commission_rate'] || '0');
     const threshold = parseFloat(settingMap['commission_threshold'] || '0');
     const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
+
+    // Build adjustment sum per user
+    const adjMap = new Map<string, number>();
+    for (const a of adjustments) {
+      adjMap.set(a.userId, (adjMap.get(a.userId) ?? 0) + a.amount);
+    }
 
     const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number }>();
     for (const visit of visits) {
@@ -304,10 +314,22 @@ export class VisitsService {
 
     const summary = Array.from(userMap.values())
       .map(({ user, count, totalAmount, pendingCount }) => {
-        const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
-        return { userId: user.id, user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount }, visitCount: count, totalAmount, reachedThreshold, commission, pendingCount };
+        const adjustment = adjMap.get(user.id) ?? 0;
+        const adjustedTotal = totalAmount + adjustment;
+        const { reachedThreshold, commission } = calculateCommission({ totalAmount: adjustedTotal, rate, threshold, tiers });
+        return {
+          userId: user.id,
+          user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount },
+          visitCount: count,
+          totalAmount,
+          adjustment,
+          adjustedTotal,
+          reachedThreshold,
+          commission,
+          pendingCount,
+        };
       })
-      .sort((a, b) => b.totalAmount - a.totalAmount);
+      .sort((a, b) => b.adjustedTotal - a.adjustedTotal);
 
     return { month, settings: { rate, threshold, tiers }, summary };
   }
