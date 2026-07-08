@@ -12,7 +12,7 @@ export class CommissionAdjustmentsController {
     @Body() body: { userId: string; month: string; amount: number; note?: string },
     @Request() req: any,
   ) {
-    return this.service.create({ ...body, createdBy: req.user.userId });
+    return this.service.create({ ...body, createdBy: req.user.id });
   }
 
   @Get()
