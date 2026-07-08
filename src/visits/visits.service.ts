@@ -313,22 +313,18 @@ export class VisitsService {
 
     const summary = Array.from(userMap.values())
       .map(({ user, count, totalAmount, pendingCount }) => {
-        const outstandingDebt = debtMap.get(user.id) ?? 0;
-        const deduction = Math.min(outstandingDebt, Math.max(0,
-          calculateCommission({ totalAmount, rate, threshold, tiers }).commission
-        ));
+        // totalAmount คือยอดสุทธิหลังหักหนี้แล้ว (amount - debtDeducted)
         const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
-        const netCommission = Math.max(0, commission - deduction);
+        // outstandingDebt แสดงผลเท่านั้น — SUM ของ log ที่เหลือ
+        const outstandingDebt = debtMap.get(user.id) ?? 0;
         return {
           userId: user.id,
           user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount },
           visitCount: count,
           totalAmount,
           outstandingDebt,
-          deduction,
           reachedThreshold,
           commission,
-          netCommission,
           pendingCount,
         };
       })
