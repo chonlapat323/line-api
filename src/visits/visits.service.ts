@@ -261,19 +261,15 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [visits, settings, adjustments] = await Promise.all([
-      this.prisma.visitRecord.findMany({
+    const [slips, settings, adjustments] = await Promise.all([
+      this.prisma.slipSubmission.findMany({
         where: {
-          result: 'buy',
-          OR: [
-            { slipStatus: { in: ['verified', 'approved', 'pending_approval'] } },
-            { slipStatus: null },
-          ],
+          slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
         select: {
           userId: true,
-          orderAmount: true,
+          amount: true,
           slipStatus: true,
           user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
         },
@@ -299,16 +295,16 @@ export class VisitsService {
     }
 
     const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number }>();
-    for (const visit of visits) {
-      if (!userMap.has(visit.userId)) {
-        userMap.set(visit.userId, { user: visit.user, count: 0, totalAmount: 0, pendingCount: 0 });
+    for (const slip of slips) {
+      if (!userMap.has(slip.userId)) {
+        userMap.set(slip.userId, { user: slip.user, count: 0, totalAmount: 0, pendingCount: 0 });
       }
-      const entry = userMap.get(visit.userId)!;
-      if (visit.slipStatus === 'pending_approval') {
+      const entry = userMap.get(slip.userId)!;
+      if (slip.slipStatus === 'pending_approval') {
         entry.pendingCount++;
       } else {
         entry.count++;
-        entry.totalAmount += visit.orderAmount ?? 0;
+        entry.totalAmount += slip.amount ?? 0;
       }
     }
 
@@ -339,14 +335,14 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [visits, settings] = await Promise.all([
-      this.prisma.visitRecord.findMany({
+    const [slips, settings] = await Promise.all([
+      this.prisma.slipSubmission.findMany({
         where: {
           userId,
-          result: 'buy',
+          slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
-        select: { id: true, shopName: true, orderAmount: true, slipStatus: true, createdAt: true },
+        select: { id: true, shopName: true, amount: true, slipStatus: true, createdAt: true },
       }),
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
@@ -358,12 +354,13 @@ export class VisitsService {
     const threshold = parseFloat(settingMap['commission_threshold'] || '0');
     const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
 
-    const { confirmed: confirmedVisits, pending: pendingVisits, totalAmount, pendingAmount } = classifyVisits(visits);
+    const mapped = slips.map((s) => ({ ...s, orderAmount: s.amount }));
+    const { confirmed: confirmedSlips, pending: pendingSlips, totalAmount, pendingAmount } = classifyVisits(mapped);
     const { reachedThreshold, commission, remaining, breakdown } = calculateCommission({ totalAmount, rate, threshold, tiers });
 
     return {
-      month, visitCount: visits.length, totalAmount, pendingAmount,
-      confirmedCount: confirmedVisits.length, pendingCount: pendingVisits.length,
+      month, visitCount: slips.length, totalAmount, pendingAmount,
+      confirmedCount: confirmedSlips.length, pendingCount: pendingSlips.length,
       reachedThreshold, commission, remaining, breakdown, settings: { rate, threshold, tiers },
     };
   }
@@ -373,23 +370,19 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    return this.prisma.visitRecord.findMany({
+    const slips = await this.prisma.slipSubmission.findMany({
       where: {
         userId: params.userId,
-        result: 'buy',
-        OR: [
-          { slipStatus: { in: ['verified', 'approved'] } },
-          { slipStatus: null },
-        ],
+        slipStatus: { in: ['verified', 'approved'] },
         createdAt: { gte: dateFrom, lte: dateTo },
       },
       select: {
-        id: true, shopName: true, province: true, district: true,
-        customerType: true, details: true,
-        orderAmount: true, slipUrl: true, slipStatus: true, transRef: true, createdAt: true,
+        id: true, shopName: true, amount: true,
+        slipUrl: true, slipStatus: true, transRef: true, createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
+    return slips.map((s) => ({ ...s, orderAmount: s.amount }));
   }
 
   async approveVisit(params: {
