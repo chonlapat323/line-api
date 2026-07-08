@@ -1,6 +1,12 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineService } from '../line/line.service';
+import { CommissionAdjustmentsService } from '../commission-adjustments/commission-adjustments.service';
+
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 @Injectable()
 export class SlipsService {
@@ -9,7 +15,37 @@ export class SlipsService {
   constructor(
     private prisma: PrismaService,
     private lineService: LineService,
+    private commissionAdjustments: CommissionAdjustmentsService,
   ) {}
+
+  async applyDebtDeduction(slipId: string, userId: string, slipAmount: number, adminId: string): Promise<number> {
+    return this.prisma.$transaction(async (tx) => {
+      // ล็อก slip ไว้ก่อน — idempotency check
+      const slip = await tx.slipSubmission.findUnique({ where: { id: slipId } });
+      if (!slip || (slip.debtDeducted ?? 0) > 0) return 0;
+
+      // อ่านยอดค้างภายใน transaction — ป้องกัน race condition
+      const result = await tx.commissionAdjustment.aggregate({
+        where: { userId },
+        _sum: { amount: true },
+      });
+      const debt = Math.max(0, result._sum.amount ?? 0);
+      if (debt <= 0 || slipAmount <= 0) return 0;
+
+      const deductAmount = Math.min(debt, slipAmount);
+      const month = getCurrentMonth();
+
+      await tx.slipSubmission.update({
+        where: { id: slipId },
+        data: { debtDeducted: deductAmount },
+      });
+      await tx.commissionAdjustment.create({
+        data: { userId, month, amount: -deductAmount, note: `หักคืนยอดค้างเดือน ${month}`, createdBy: adminId },
+      });
+
+      return deductAmount;
+    }, { isolationLevel: 'Serializable' });
+  }
 
   async submit(params: {
     userId: string;
@@ -33,7 +69,10 @@ export class SlipsService {
     });
 
     if (params.slipStatus === 'verified' && params.amount) {
-      await this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details);
+      await Promise.all([
+        this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details),
+        this.applyDebtDeduction(submission.id, params.userId, params.amount, params.userId),
+      ]);
     }
 
     return submission;
@@ -135,14 +174,10 @@ export class SlipsService {
       data: { slipStatus: 'approved', amount, approvedBy: params.adminId, approvedAt: new Date() },
     });
 
-    await this.sendToLine(
-      submission.id,
-      submission.userId,
-      submission.slipUrl,
-      submission.shopName,
-      amount,
-      submission.details ?? undefined,
-    );
+    await Promise.all([
+      this.sendToLine(submission.id, submission.userId, submission.slipUrl, submission.shopName, amount, submission.details ?? undefined),
+      this.applyDebtDeduction(submission.id, submission.userId, amount, params.adminId),
+    ]);
 
     return updated;
   }

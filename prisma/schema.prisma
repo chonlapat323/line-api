@@ -114,11 +114,12 @@ model SlipSubmission {
   amount      Float?
   details     String?
   slipUrl     String
-  slipStatus  String    // "verified" | "pending_approval" | "approved" | "rejected"
-  transRef    String?
-  lineStatus  String?   // "sent" | "failed"
-  approvedBy  String?
-  approvedAt  DateTime?
+  slipStatus    String    // "verified" | "pending_approval" | "approved" | "rejected"
+  transRef      String?
+  lineStatus    String?   // "sent" | "failed"
+  approvedBy    String?
+  approvedAt    DateTime?
+  debtDeducted  Float     @default(0) // ยอดที่หักคืนหนี้จาก slip นี้
   createdAt   DateTime  @default(now())
 
   user     User  @relation("SlipSubmissions", fields: [userId], references: [id])

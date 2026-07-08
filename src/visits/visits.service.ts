@@ -270,6 +270,7 @@ export class VisitsService {
         select: {
           userId: true,
           amount: true,
+          debtDeducted: true,
           slipStatus: true,
           user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
         },
@@ -306,7 +307,7 @@ export class VisitsService {
         entry.pendingCount++;
       } else {
         entry.count++;
-        entry.totalAmount += slip.amount ?? 0;
+        entry.totalAmount += (slip.amount ?? 0) - (slip.debtDeducted ?? 0);
       }
     }
 
