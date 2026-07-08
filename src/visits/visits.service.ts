@@ -261,7 +261,7 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [slips, settings, adjustments] = await Promise.all([
+    const [slips, settings, allAdjustments, monthHelpAdjs] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where: {
           slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
@@ -278,10 +278,19 @@ export class VisitsService {
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
-      // ยอดค้างรวม = SUM ทุก record ของแต่ละ user (ไม่ filter by month)
+      // ยอดค้างรวม = SUM ทุก record ไม่ filter by month
       this.prisma.commissionAdjustment.groupBy({
         by: ['userId'],
         _sum: { amount: true },
+      }),
+      // ช่วยยอด (positive) ของเดือนนี้ — บวกเข้า totalAmount เพื่อคำนวณ commission
+      this.prisma.commissionAdjustment.findMany({
+        where: { month, amount: { gt: 0 } },
+        select: {
+          userId: true,
+          amount: true,
+          user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
+        },
       }),
     ]);
 
@@ -292,15 +301,22 @@ export class VisitsService {
 
     // ยอดค้างรวมต่อ user
     const debtMap = new Map<string, number>();
-    for (const a of adjustments) {
+    for (const a of allAdjustments) {
       const debt = Math.max(0, a._sum.amount ?? 0);
       if (debt > 0) debtMap.set(a.userId, debt);
     }
 
-    const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number }>();
+    // ยอดช่วยยอดเดือนนี้ต่อ user
+    const monthHelpMap = new Map<string, { total: number; user: any }>();
+    for (const a of monthHelpAdjs) {
+      if (!monthHelpMap.has(a.userId)) monthHelpMap.set(a.userId, { total: 0, user: a.user });
+      monthHelpMap.get(a.userId)!.total += a.amount;
+    }
+
+    const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number; adjustment: number }>();
     for (const slip of slips) {
       if (!userMap.has(slip.userId)) {
-        userMap.set(slip.userId, { user: slip.user, count: 0, totalAmount: 0, pendingCount: 0 });
+        userMap.set(slip.userId, { user: slip.user, count: 0, totalAmount: 0, pendingCount: 0, adjustment: 0 });
       }
       const entry = userMap.get(slip.userId)!;
       if (slip.slipStatus === 'pending_approval') {
@@ -311,17 +327,26 @@ export class VisitsService {
       }
     }
 
+    // เพิ่มยอดช่วยยอดเดือนนี้เข้า totalAmount (รวม user ที่ไม่มี slip ด้วย)
+    for (const [userId, { total, user }] of monthHelpMap.entries()) {
+      if (!userMap.has(userId)) {
+        userMap.set(userId, { user, count: 0, totalAmount: 0, pendingCount: 0, adjustment: 0 });
+      }
+      const entry = userMap.get(userId)!;
+      entry.totalAmount += total;
+      entry.adjustment += total;
+    }
+
     const summary = Array.from(userMap.values())
-      .map(({ user, count, totalAmount, pendingCount }) => {
-        // totalAmount คือยอดสุทธิหลังหักหนี้แล้ว (amount - debtDeducted)
+      .map(({ user, count, totalAmount, pendingCount, adjustment }) => {
         const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
-        // outstandingDebt แสดงผลเท่านั้น — SUM ของ log ที่เหลือ
         const outstandingDebt = debtMap.get(user.id) ?? 0;
         return {
           userId: user.id,
           user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount },
           visitCount: count,
           totalAmount,
+          adjustment,      // ยอดที่ admin ช่วยเดือนนี้
           outstandingDebt,
           reachedThreshold,
           commission,
