@@ -60,6 +60,14 @@ export class CommissionAdjustmentsService {
     });
   }
 
+  async findByUser(userId: string) {
+    return this.prisma.commissionAdjustment.findMany({
+      where: { userId },
+      include: { admin: { select: { fullName: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async sumByUserAndMonth(userId: string, month: string): Promise<number> {
     const result = await this.prisma.commissionAdjustment.aggregate({
       where: { userId, month },

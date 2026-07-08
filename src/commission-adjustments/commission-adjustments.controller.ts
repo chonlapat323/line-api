@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, Request, UseGuards } from '@nestjs/common';
 import { CommissionAdjustmentsService } from './commission-adjustments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -18,5 +18,10 @@ export class CommissionAdjustmentsController {
   @Get()
   findByMonth(@Query('month') month: string) {
     return this.service.findByMonth(month);
+  }
+
+  @Get('user/:userId')
+  findByUser(@Param('userId') userId: string) {
+    return this.service.findByUser(userId);
   }
 }
