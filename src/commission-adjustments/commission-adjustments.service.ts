@@ -82,4 +82,15 @@ export class CommissionAdjustmentsService {
     });
     return result._sum.amount ?? 0;
   }
+
+  // ยอดค้างทุก user — ใช้แสดงใน Users page
+  async getOutstandingDebtAll(): Promise<{ userId: string; outstandingDebt: number }[]> {
+    const rows = await this.prisma.commissionAdjustment.groupBy({
+      by: ['userId'],
+      _sum: { amount: true },
+    });
+    return rows
+      .map((r) => ({ userId: r.userId, outstandingDebt: Math.max(0, r._sum.amount ?? 0) }))
+      .filter((r) => r.outstandingDebt > 0);
+  }
 }

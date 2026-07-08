@@ -15,6 +15,11 @@ export class CommissionAdjustmentsController {
     return this.service.create({ ...body, createdBy: req.user.id });
   }
 
+  @Get('outstanding')
+  getOutstandingDebtAll() {
+    return this.service.getOutstandingDebtAll();
+  }
+
   @Get()
   findByMonth(@Query('month') month: string) {
     return this.service.findByMonth(month);
