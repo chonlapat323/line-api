@@ -277,9 +277,10 @@ export class VisitsService {
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
-      this.prisma.commissionAdjustment.findMany({
-        where: { month },
-        select: { userId: true, amount: true, note: true },
+      // ยอดค้างรวม = SUM ทุก record ของแต่ละ user (ไม่ filter by month)
+      this.prisma.commissionAdjustment.groupBy({
+        by: ['userId'],
+        _sum: { amount: true },
       }),
     ]);
 
@@ -288,10 +289,11 @@ export class VisitsService {
     const threshold = parseFloat(settingMap['commission_threshold'] || '0');
     const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
 
-    // Build adjustment sum per user
-    const adjMap = new Map<string, number>();
+    // ยอดค้างรวมต่อ user
+    const debtMap = new Map<string, number>();
     for (const a of adjustments) {
-      adjMap.set(a.userId, (adjMap.get(a.userId) ?? 0) + a.amount);
+      const debt = Math.max(0, a._sum.amount ?? 0);
+      if (debt > 0) debtMap.set(a.userId, debt);
     }
 
     const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number }>();
@@ -310,22 +312,26 @@ export class VisitsService {
 
     const summary = Array.from(userMap.values())
       .map(({ user, count, totalAmount, pendingCount }) => {
-        const adjustment = adjMap.get(user.id) ?? 0;
-        const adjustedTotal = totalAmount + adjustment;
-        const { reachedThreshold, commission } = calculateCommission({ totalAmount: adjustedTotal, rate, threshold, tiers });
+        const outstandingDebt = debtMap.get(user.id) ?? 0;
+        const deduction = Math.min(outstandingDebt, Math.max(0,
+          calculateCommission({ totalAmount, rate, threshold, tiers }).commission
+        ));
+        const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
+        const netCommission = Math.max(0, commission - deduction);
         return {
           userId: user.id,
           user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount },
           visitCount: count,
           totalAmount,
-          adjustment,
-          adjustedTotal,
+          outstandingDebt,
+          deduction,
           reachedThreshold,
           commission,
+          netCommission,
           pendingCount,
         };
       })
-      .sort((a, b) => b.adjustedTotal - a.adjustedTotal);
+      .sort((a, b) => b.totalAmount - a.totalAmount);
 
     return { month, settings: { rate, threshold, tiers }, summary };
   }
