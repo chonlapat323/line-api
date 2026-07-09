@@ -363,17 +363,27 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [slips, settings] = await Promise.all([
+    const [slips, settings, monthHelpAdjs, debtResult] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where: {
           userId,
           slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
-        select: { id: true, shopName: true, amount: true, slipStatus: true, createdAt: true },
+        select: { id: true, shopName: true, amount: true, debtDeducted: true, slipStatus: true, createdAt: true },
       }),
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
+      }),
+      // ช่วยยอด (positive) เดือนนี้ — เหมือน getCommissionSummary
+      this.prisma.commissionAdjustment.findMany({
+        where: { userId, month, amount: { gt: 0 } },
+        select: { amount: true },
+      }),
+      // ยอดค้างรวมทั้งหมด (SUM ทุก record ไม่ filter by month)
+      this.prisma.commissionAdjustment.aggregate({
+        where: { userId },
+        _sum: { amount: true },
       }),
     ]);
 
@@ -382,13 +392,25 @@ export class VisitsService {
     const threshold = parseFloat(settingMap['commission_threshold'] || '0');
     const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
 
-    const mapped = slips.map((s) => ({ ...s, orderAmount: s.amount }));
-    const { confirmed: confirmedSlips, pending: pendingSlips, totalAmount, pendingAmount } = classifyVisits(mapped);
+    const confirmedSlips = slips.filter((s) => s.slipStatus !== 'pending_approval');
+    const pendingSlips   = slips.filter((s) => s.slipStatus === 'pending_approval');
+
+    // หัก debtDeducted เหมือน getCommissionSummary
+    const slipNet      = confirmedSlips.reduce((s, v) => s + (v.amount ?? 0) - (v.debtDeducted ?? 0), 0);
+    const pendingAmount = pendingSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
+
+    // บวกช่วยยอดเดือนนี้ เหมือน getCommissionSummary
+    const adjustment  = monthHelpAdjs.reduce((s, a) => s + a.amount, 0);
+    const totalAmount = slipNet + adjustment;
+
+    const outstandingDebt = Math.max(0, debtResult._sum.amount ?? 0);
+
     const { reachedThreshold, commission, remaining, breakdown } = calculateCommission({ totalAmount, rate, threshold, tiers });
 
     return {
       month, visitCount: slips.length, totalAmount, pendingAmount,
       confirmedCount: confirmedSlips.length, pendingCount: pendingSlips.length,
+      adjustment, outstandingDebt,
       reachedThreshold, commission, remaining, breakdown, settings: { rate, threshold, tiers },
     };
   }
@@ -405,12 +427,12 @@ export class VisitsService {
         createdAt: { gte: dateFrom, lte: dateTo },
       },
       select: {
-        id: true, shopName: true, amount: true,
+        id: true, shopName: true, amount: true, debtDeducted: true,
         slipUrl: true, slipStatus: true, transRef: true, createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
-    return slips.map((s) => ({ ...s, orderAmount: s.amount }));
+    return slips.map((s) => ({ ...s, orderAmount: s.amount, netAmount: (s.amount ?? 0) - (s.debtDeducted ?? 0) }));
   }
 
   async approveVisit(params: {
