@@ -48,14 +48,26 @@ describe('UsersService', () => {
 
   // ── findById ──────────────────────────────────────────────────
   describe('findById', () => {
-    it('queries by id and returns user', async () => {
-      const user = { id: 'u1', email: 'a@b.com', role: 'user' };
+    it('queries by id and returns user with lineConnected flag', async () => {
+      const user = { id: 'u1', email: 'a@b.com', role: 'user', lineGroups: [] };
       prismaUser.findUnique.mockResolvedValue(user);
       const result = await service.findById('u1');
-      expect(result).toBe(user);
+      expect(result).toMatchObject({ id: 'u1', email: 'a@b.com', role: 'user', lineConnected: false });
       expect(prismaUser.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'u1' } }),
       );
+    });
+
+    it('sets lineConnected true when user has lineGroups', async () => {
+      const user = { id: 'u1', email: 'a@b.com', role: 'user', lineGroups: [{ id: 'g1' }] };
+      prismaUser.findUnique.mockResolvedValue(user);
+      const result = await service.findById('u1');
+      expect(result).toMatchObject({ lineConnected: true });
+    });
+
+    it('returns null when user not found', async () => {
+      prismaUser.findUnique.mockResolvedValue(null);
+      await expect(service.findById('u1')).resolves.toBeNull();
     });
   });
 
