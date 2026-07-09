@@ -20,6 +20,12 @@ export class CommissionAdjustmentsController {
     return this.service.getOutstandingDebtAll();
   }
 
+  @Get('me/outstanding')
+  async getMyOutstanding(@Request() req: any) {
+    const outstandingDebt = await this.service.getOutstandingDebt(req.user.id);
+    return { outstandingDebt };
+  }
+
   @Get()
   findByMonth(@Query('month') month: string) {
     return this.service.findByMonth(month);
