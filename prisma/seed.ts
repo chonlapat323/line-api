@@ -319,15 +319,10 @@ async function seedMockupJune2026() {
   console.log(`  77 provinces, 11 sales users, password: sale1234`);
 }
 
-// ── July 2026 Mockup — เยอะๆ เพื่อดูหน้าจ่ายค่าคอม ──────────────────────────
-const JULY_WORKDAYS: number[] = [];
-for (let d = 1; d <= 31; d++) {
-  const day = new Date(2026, 6, d).getDay();
-  if (day !== 0 && day !== 6) JULY_WORKDAYS.push(d);
-}
+// ── July 2026 Mockup — เฉพาะวันที่ 30 กรกฎาคม 2026 ──────────────────────────
 function julyDate(): Date {
-  const day = rand(JULY_WORKDAYS);
-  return new Date(2026, 6, day, randInt(8, 17), randInt(0, 59), 0);
+  // วันที่ 30 ก.ค. 2026 เวลา 08:00 – 17:59
+  return new Date(2026, 6, 30, randInt(8, 17), randInt(0, 59), 0);
 }
 // buy เยอะ, slip ทุกใบเป็น verified/approved (นับ commission ได้)
 const JULY_RESULTS      = ['buy','buy','buy','buy','buy','buy','buy','no_buy','not_found','not_found'] as const;
@@ -396,10 +391,118 @@ async function seedMockupJuly2026() {
   }
 
   await prisma.visitRecord.createMany({ data: rows });
+
+  // สร้าง SlipSubmission สำหรับการ buy ทุกรายการ (commission query ดูจาก slipSubmission ไม่ใช่ visitRecord)
+  const slipRows = rows
+    .filter((r) => r.result === 'buy' && r.orderAmount)
+    .map((r) => ({
+      userId:      r.userId,
+      shopName:    r.shopName,
+      amount:      r.orderAmount as number,
+      slipUrl:     r.imageUrls[0] ?? 'https://picsum.photos/400/300',
+      slipStatus:  r.slipStatus as string,
+      transRef:    r.transRef ?? null,
+      createdAt:   r.createdAt,
+      debtDeducted: 0,
+    }));
+
+  // Clear slip submissions ของ mock users เฉพาะ July 2026
+  await prisma.slipSubmission.deleteMany({
+    where: {
+      userId: { in: userIds },
+      createdAt: { gte: new Date(2026, 6, 1), lte: new Date(2026, 6, 31, 23, 59, 59) },
+    },
+  });
+  await prisma.slipSubmission.createMany({ data: slipRows });
+
   const buy = rows.filter((r) => r.result === 'buy').length;
-  const totalAmt = rows.reduce((s, r) => s + (r.orderAmount ?? 0), 0);
+  const totalAmt = slipRows.reduce((s, r) => s + (r.amount ?? 0), 0);
   console.log(`  created ${rows.length} visits — ซื้อ ${buy} / ไม่ซื้อ ${rows.filter(r=>r.result==='no_buy').length} / ไม่พบ ${rows.filter(r=>r.result==='not_found').length}`);
-  console.log(`  ยอดขายรวม ฿${totalAmt.toLocaleString('th-TH')}`);
+  console.log(`  created ${slipRows.length} slip submissions — ยอดรวม ฿${totalAmt.toLocaleString('th-TH')}`);
+}
+
+// ── Commission Adjustment Mock Data ──────────────────────────────────────────
+async function seedCommissionAdjustments(adminId: string, userMap: Record<string, string>) {
+  console.log('\n── Commission Adjustments ───────────────────────');
+
+  const mockAdjs = [
+    // ยอดเติมเดือนนี้ (July 2026)
+    { email: 'sale.bkk1@beautyup.com',    month: '2026-07', amount: 25000, note: 'ช่วยยอดพิเศษกรุงเทพ' },
+    { email: 'sale.north1@beautyup.com',  month: '2026-07', amount: 15000, note: 'ช่วยยอด Q3 ภาคเหนือ' },
+    { email: 'sale.neast3@beautyup.com',  month: '2026-07', amount: 20000, note: 'ช่วยยอดโคราช' },
+    // ยอดยกมาจาก June 2026 — ทดสอบ deduction ผ่าน slip
+    { email: 'sale.east@beautyup.com',    month: '2026-06', amount: 30000, note: 'ช่วยยอดมิ.ย. ภาคตะวันออก' },
+    { email: 'sale.neast1@beautyup.com',  month: '2026-06', amount: 20000, note: 'ช่วยยอดมิ.ย. ขอนแก่น' },
+    { email: 'sale.south1@beautyup.com',  month: '2026-06', amount: 18000, note: 'ช่วยยอดมิ.ย. ภาคใต้' },
+    // sale.central — ยอดค้างยกมาจาก มิ.ย. (debt_carryover: ไม่บวกเข้า commission formula)
+    { email: 'sale.central@beautyup.com', month: '2026-06', amount: 80000, note: 'ยอดค้างยกมา มิ.ย. ภาคกลาง', type: 'debt_carryover' },
+  ];
+
+  const mockUserIds = Object.values(userMap);
+  await prisma.commissionAdjustment.deleteMany({
+    where: { userId: { in: mockUserIds }, month: { in: ['2026-06', '2026-07'] } },
+  });
+
+  let count = 0;
+  for (const adj of mockAdjs) {
+    const userId = userMap[adj.email];
+    if (!userId) { console.log(`  ไม่พบ user: ${adj.email}`); continue; }
+    await prisma.commissionAdjustment.create({
+      data: { userId, month: adj.month, amount: adj.amount, note: adj.note, createdBy: adminId, type: (adj as any).type ?? 'loan_help' },
+    });
+    count++;
+    console.log(`  ช่วยยอด ${adj.email.split('@')[0]}: +฿${adj.amount.toLocaleString('th-TH')} (${adj.month})`);
+  }
+  console.log(`  created ${count} adjustments`);
+}
+
+// ── Simulate Debt Deduction (สำหรับ demo carryover ที่ถูกหักผ่าน slip) ────────
+async function seedDebtDeductions(adminId: string) {
+  console.log('\n── Debt Deduction Simulation ────────────────────');
+
+  // เฉพาะ sale.central ที่มี June carryover +25,000
+  const user = await prisma.user.findUnique({ where: { email: 'sale.central@beautyup.com' } });
+  if (!user) { console.log('  ไม่พบ sale.central'); return; }
+
+  // Reset: ลบ negative adjustments ที่เคย seed ไว้ก่อน แล้ว reset debtDeducted = 0
+  await prisma.commissionAdjustment.deleteMany({
+    where: { userId: user.id, amount: { lt: 0 }, month: '2026-07' },
+  });
+  await prisma.slipSubmission.updateMany({
+    where: { userId: user.id, createdAt: { gte: new Date(2026, 6, 1) } },
+    data: { debtDeducted: 0 },
+  });
+
+  // ดึง slip ทั้งหมดเดือน July 2026 เรียงตาม createdAt
+  const slips = await prisma.slipSubmission.findMany({
+    where: { userId: user.id, createdAt: { gte: new Date(2026, 6, 1), lte: new Date(2026, 6, 31, 23, 59, 59) } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  let remainingDebt = 80000;
+  let totalDeducted = 0;
+  let slipsProcessed = 0;
+
+  for (const slip of slips) {
+    if (remainingDebt <= 0 || slipsProcessed >= 2) break; // หักแค่ 2 slip แรก → มียอดค้างเหลือ
+    const deductAmount = Math.min(remainingDebt, slip.amount);
+    await prisma.slipSubmission.update({ where: { id: slip.id }, data: { debtDeducted: deductAmount } });
+    await prisma.commissionAdjustment.create({
+      data: {
+        userId: user.id,
+        month: '2026-07',
+        amount: -deductAmount,
+        note: `หักคืนยอดค้างเดือน 2026-06 จาก slip #${slip.id.slice(-6)}`,
+        createdBy: adminId,
+      },
+    });
+    remainingDebt -= deductAmount;
+    totalDeducted += deductAmount;
+    slipsProcessed++;
+    console.log(`  slip ฿${slip.amount.toLocaleString('th-TH')} → หัก ฿${deductAmount.toLocaleString('th-TH')} | ค้างเหลือ ฿${remainingDebt.toLocaleString('th-TH')}`);
+  }
+
+  console.log(`  หักรวม ฿${totalDeducted.toLocaleString('th-TH')} / ยอดค้างเหลือ ฿${remainingDebt.toLocaleString('th-TH')}`);
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -455,6 +558,8 @@ async function main() {
 
   // 5. Mockup July 2026 — buy เยอะ + commission settings
   await seedMockupJuly2026();
+
+  // 6. Commission adjustments — ข้ามไปก่อน (เพิ่มเองผ่าน admin panel)
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

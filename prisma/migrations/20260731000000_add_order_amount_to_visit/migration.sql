@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "VisitRecord" ADD COLUMN IF NOT EXISTS "orderAmount" DOUBLE PRECISION;

@@ -24,12 +24,19 @@ export class SlipsService {
       const slip = await tx.slipSubmission.findUnique({ where: { id: slipId } });
       if (!slip || (slip.debtDeducted ?? 0) > 0) return 0;
 
-      // อ่านยอดค้างภายใน transaction — ป้องกัน race condition
-      const result = await tx.commissionAdjustment.aggregate({
-        where: { userId },
-        _sum: { amount: true },
-      });
-      const debt = Math.max(0, result._sum.amount ?? 0);
+      // อ่านยอดค้างจากเดือนก่อนเท่านั้น (ไม่นับยอดให้ยืมเดือนนี้ที่ยังไม่ถึงกำหนดหัก)
+      const currentMonth = getCurrentMonth();
+      const [prevPosResult, allNegResult] = await Promise.all([
+        tx.commissionAdjustment.aggregate({
+          where: { userId, month: { lt: currentMonth }, amount: { gt: 0 } },
+          _sum: { amount: true },
+        }),
+        tx.commissionAdjustment.aggregate({
+          where: { userId, amount: { lt: 0 } },
+          _sum: { amount: true },
+        }),
+      ]);
+      const debt = Math.max(0, (prevPosResult._sum.amount ?? 0) + (allNegResult._sum.amount ?? 0));
       if (debt <= 0 || slipAmount <= 0) return 0;
 
       const deductAmount = Math.min(debt, slipAmount);
@@ -94,6 +101,7 @@ export class SlipsService {
         title: shopName,
         price: `฿${amount.toLocaleString('th-TH')}`,
         note: details ?? '',
+        type: 'slip',
       });
       await this.prisma.slipSubmission.update({
         where: { id: submissionId },
@@ -133,8 +141,8 @@ export class SlipsService {
     }
     if (params.dateFrom || params.dateTo) {
       where.createdAt = {};
-      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom);
-      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo);
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom + "T00:00:00");
+      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo + "T23:59:59");
     }
 
     const [data, total] = await Promise.all([

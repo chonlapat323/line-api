@@ -131,6 +131,7 @@ model CommissionAdjustment {
   userId    String
   month     String
   amount    Float
+  type      String   @default("loan_help")
   note      String?
   createdBy String
   createdAt DateTime @default(now())

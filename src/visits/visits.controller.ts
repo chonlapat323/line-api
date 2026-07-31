@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Patch, Get, Body, Param, Query,
+  Controller, Post, Patch, Delete, Get, Body, Param, Query,
   UseGuards, UseInterceptors, UploadedFiles, UploadedFile, Request, Logger,
 } from '@nestjs/common';
 import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
@@ -100,6 +100,25 @@ export class VisitsController {
       amount: body.amount,
       adminId: req.user.id,
       role: req.user.role,
+    });
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  deleteVisit(@Param('id') id: string, @Request() req) {
+    return this.visitsService.deleteVisit(id, req.user.id, req.user.role);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  updateVisit(@Param('id') id: string, @Body() body: any, @Request() req) {
+    return this.visitsService.updateVisit(id, req.user.id, req.user.role, {
+      shopName: body.shopName,
+      result: body.result,
+      orderAmount: body.orderAmount !== undefined
+        ? (body.orderAmount === null ? null : Number(body.orderAmount))
+        : undefined,
+      details: body.details,
     });
   }
 

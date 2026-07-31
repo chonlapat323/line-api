@@ -13,6 +13,7 @@ export class CommissionAdjustmentsService {
     createdBy: string;
   }) {
     if (data.amount === 0) throw new BadRequestException('amount must not be zero');
+    if (data.amount > 50000) throw new BadRequestException('ช่วยยอดได้ไม่เกิน 50,000 บาทต่อครั้ง');
 
     return this.prisma.commissionAdjustment.create({
       data: {

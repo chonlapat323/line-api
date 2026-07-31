@@ -107,15 +107,22 @@ export class LineService {
     price?: string;
     note?: string;
     senderName: string;
+    type?: 'trip' | 'slip';
   }): lineBot.messagingApi.FlexMessage {
-    const { imageUrls, title, price, note, senderName } = data;
+    const { imageUrls, title, price, note, senderName, type } = data;
     const isSingle = imageUrls.length === 1;
 
-    const copyText = [title, price ? `ยอด: ${price}` : '', note, `โดย: ${senderName}`].filter(Boolean).join('\n');
+    const priceLabel = type === 'trip' ? 'เปิดบิล' : 'ยอด';
+    const priceColor = type === 'trip' ? '#2ba05a' : '#e83e8c';
+    const typeLabel = type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : null;
+    const altPrefix = type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : 'ส่งรูปสินค้า';
+
+    const copyText = [title, price ? `${priceLabel}: ${price}` : '', note, `โดย: ${senderName}`].filter(Boolean).join('\n');
 
     const infoContents: any[] = [
+      ...(typeLabel ? [{ type: 'text', text: typeLabel, size: 'xs', color: '#e83e8c', weight: 'bold' }] : []),
       { type: 'text', text: title, weight: 'bold', size: 'lg', wrap: true },
-      ...(price ? [{ type: 'text', text: `ยอด: ${price}`, size: 'md', color: '#e63c3c' }] : []),
+      ...(price ? [{ type: 'text', text: `${priceLabel}: ${price}`, size: 'md', color: priceColor }] : []),
       ...(note ? [{ type: 'text', text: note, size: 'sm', color: '#666666', wrap: true }] : []),
       { type: 'text', text: `โดย: ${senderName}`, size: 'xs', color: '#aaaaaa' },
       {
@@ -131,7 +138,7 @@ export class LineService {
     if (isSingle) {
       return {
         type: 'flex',
-        altText: `${senderName} ส่งรูปสินค้า: ${title}`,
+        altText: `${senderName} ${altPrefix}: ${title}`,
         contents: {
           type: 'bubble',
           hero: {
@@ -155,7 +162,7 @@ export class LineService {
     // Multiple images → grid + info below
     return {
       type: 'flex',
-      altText: `${senderName} ส่งรูปสินค้า ${imageUrls.length} รูป: ${title}`,
+      altText: `${senderName} ${altPrefix} ${imageUrls.length} รูป: ${title}`,
       contents: {
         type: 'bubble',
         body: {
@@ -194,6 +201,7 @@ export class LineService {
     price: string;
     note: string;
     senderName: string;
+    type?: 'trip' | 'slip';
   }) {
     const { imageUrls, senderName } = params;
     const primaryImageUrl = imageUrls[0];
@@ -206,6 +214,7 @@ export class LineService {
       price: params.price,
       note: params.note,
       senderName,
+      type: params.type,
     });
 
     for (const targetUserId of params.targetUserIds) {
@@ -261,6 +270,7 @@ export class LineService {
     title: string;
     price: string;
     note: string;
+    type?: 'trip' | 'slip';
   }) {
     const appUrl = process.env.APP_URL || 'http://localhost:3001';
     const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
@@ -276,6 +286,7 @@ export class LineService {
     title: string;
     price: string;
     note: string;
+    type?: 'trip' | 'slip';
   }) {
     const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
     if (!sender) return { error: 'ไม่พบผู้ใช้' };

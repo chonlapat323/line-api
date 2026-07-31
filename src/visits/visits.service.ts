@@ -161,6 +161,7 @@ export class VisitsService {
         ? `฿${params.orderAmount.toLocaleString('th-TH')}`
         : '',
       note: noteParts,
+      type: 'trip',
     });
 
     return { record, lineResult };
@@ -196,8 +197,8 @@ export class VisitsService {
     if (params.customerType) where.customerType = params.customerType;
     if (params.dateFrom || params.dateTo) {
       where.createdAt = {};
-      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom);
-      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo);
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom.includes('T') ? params.dateFrom : params.dateFrom + "T00:00:00");
+      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo.includes('T') ? params.dateTo : params.dateTo + "T23:59:59");
     }
     if (params.search) {
       where.OR = [
@@ -236,8 +237,8 @@ export class VisitsService {
     if (params.role !== 'admin') where.userId = params.userId;
     if (params.dateFrom || params.dateTo) {
       where.createdAt = {};
-      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom);
-      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo);
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom.includes('T') ? params.dateFrom : params.dateFrom + "T00:00:00");
+      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo.includes('T') ? params.dateTo : params.dateTo + "T23:59:59");
     }
 
     const records = await this.prisma.visitRecord.findMany({
@@ -261,7 +262,7 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [slips, settings, allAdjustments, monthHelpAdjs] = await Promise.all([
+    const [slips, settings, prevPosAdjRows, allNegAdjRows, adjThisMonthRows, adjCarryoverRows] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where: {
           slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
@@ -278,19 +279,29 @@ export class VisitsService {
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
-      // ยอดค้างรวม = SUM ทุก record ไม่ filter by month
+      // ยอดช่วยยอดเดือนก่อนๆ (positive เท่านั้น, month < currentMonth) — ยอดที่ต้องหักคืน
       this.prisma.commissionAdjustment.groupBy({
         by: ['userId'],
+        where: { month: { lt: month }, amount: { gt: 0 } },
         _sum: { amount: true },
       }),
-      // ช่วยยอด (positive) ของเดือนนี้ — บวกเข้า totalAmount เพื่อคำนวณ commission
-      this.prisma.commissionAdjustment.findMany({
-        where: { month, amount: { gt: 0 } },
-        select: {
-          userId: true,
-          amount: true,
-          user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
-        },
+      // ยอดหักคืนทั้งหมด (negative ทุก month) — สิ่งที่หักคืนไปแล้ว
+      this.prisma.commissionAdjustment.groupBy({
+        by: ['userId'],
+        where: { amount: { lt: 0 } },
+        _sum: { amount: true },
+      }),
+      // ยอดเติมเดือนนี้ loan_help เท่านั้น (บวกเข้า commission formula)
+      this.prisma.commissionAdjustment.groupBy({
+        by: ['userId'],
+        where: { month, amount: { gt: 0 }, type: 'loan_help' },
+        _sum: { amount: true },
+      }),
+      // ยอดเติมยกมา loan_help NET (บวกลบรวม — เฉพาะ type loan_help เดือนก่อนๆ)
+      this.prisma.commissionAdjustment.groupBy({
+        by: ['userId'],
+        where: { month: { lt: month }, type: 'loan_help' },
+        _sum: { amount: true },
       }),
     ]);
 
@@ -299,54 +310,74 @@ export class VisitsService {
     const threshold = parseFloat(settingMap['commission_threshold'] || '0');
     const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
 
-    // ยอดค้างรวมต่อ user
+    // ยอดค้างจากเดือนก่อน (เฉพาะ positive เดือนก่อน + negative ทุกเดือน)
+    const prevPosMap = new Map<string, number>();
+    for (const a of prevPosAdjRows) prevPosMap.set(a.userId, a._sum.amount ?? 0);
+    const allNegMap = new Map<string, number>();
+    for (const a of allNegAdjRows) allNegMap.set(a.userId, a._sum.amount ?? 0);
     const debtMap = new Map<string, number>();
-    for (const a of allAdjustments) {
-      const debt = Math.max(0, a._sum.amount ?? 0);
-      if (debt > 0) debtMap.set(a.userId, debt);
+    const allUserIds = new Set([...prevPosMap.keys(), ...allNegMap.keys()]);
+    for (const uid of allUserIds) {
+      const debt = Math.max(0, (prevPosMap.get(uid) ?? 0) + (allNegMap.get(uid) ?? 0));
+      if (debt > 0) debtMap.set(uid, debt);
     }
 
-    // ยอดช่วยยอดเดือนนี้ต่อ user
-    const monthHelpMap = new Map<string, { total: number; user: any }>();
-    for (const a of monthHelpAdjs) {
-      if (!monthHelpMap.has(a.userId)) monthHelpMap.set(a.userId, { total: 0, user: a.user });
-      monthHelpMap.get(a.userId)!.total += a.amount;
-    }
+    // ยอดเติมเดือนนี้ต่อ user
+    const adjThisMonthMap = new Map<string, number>();
+    for (const a of adjThisMonthRows) adjThisMonthMap.set(a.userId, a._sum.amount ?? 0);
 
-    const userMap = new Map<string, { user: any; count: number; totalAmount: number; pendingCount: number; adjustment: number }>();
+    // ยอดเติมยกมาต่อ user
+    const adjCarryoverMap = new Map<string, number>();
+    for (const a of adjCarryoverRows) adjCarryoverMap.set(a.userId, a._sum.amount ?? 0);
+
+    const userMap = new Map<string, { user: any; count: number; slipAmount: number; totalDeducted: number; pendingCount: number }>();
     for (const slip of slips) {
       if (!userMap.has(slip.userId)) {
-        userMap.set(slip.userId, { user: slip.user, count: 0, totalAmount: 0, pendingCount: 0, adjustment: 0 });
+        userMap.set(slip.userId, { user: slip.user, count: 0, slipAmount: 0, totalDeducted: 0, pendingCount: 0 });
       }
       const entry = userMap.get(slip.userId)!;
       if (slip.slipStatus === 'pending_approval') {
         entry.pendingCount++;
       } else {
         entry.count++;
-        entry.totalAmount += (slip.amount ?? 0) - (slip.debtDeducted ?? 0);
+        entry.slipAmount += (slip.amount ?? 0);           // gross — commission คำนวณจากยอดขายจริง
+        entry.totalDeducted += (slip.debtDeducted ?? 0);  // หักคืนหนี้แยกต่างหาก
       }
     }
 
-    // เพิ่มยอดช่วยยอดเดือนนี้เข้า totalAmount (รวม user ที่ไม่มี slip ด้วย)
-    for (const [userId, { total, user }] of monthHelpMap.entries()) {
-      if (!userMap.has(userId)) {
-        userMap.set(userId, { user, count: 0, totalAmount: 0, pendingCount: 0, adjustment: 0 });
+    // ดึง user info สำหรับ users ที่มี adjustment แต่ไม่มี slip เดือนนี้
+    const missingUserIds = [...new Set([
+      ...Array.from(adjThisMonthMap.keys()),
+      ...Array.from(adjCarryoverMap.keys()),
+    ])].filter((uid) => !userMap.has(uid));
+
+    if (missingUserIds.length > 0) {
+      const missingUsers = await this.prisma.user.findMany({
+        where: { id: { in: missingUserIds } },
+        select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true },
+      });
+      for (const u of missingUsers) {
+        userMap.set(u.id, { user: u, count: 0, slipAmount: 0, totalDeducted: 0, pendingCount: 0 });
       }
-      const entry = userMap.get(userId)!;
-      entry.totalAmount += total;
-      entry.adjustment += total;
     }
 
-    const summary = Array.from(userMap.values())
-      .map(({ user, count, totalAmount, pendingCount, adjustment }) => {
+    const summary = Array.from(userMap.entries())
+      .map(([uid, { user, count, slipAmount, totalDeducted, pendingCount }]) => {
+        const adjustThisMonth = adjThisMonthMap.get(uid) ?? 0;
+        const adjustCarryover = adjCarryoverMap.get(uid) ?? 0;
+        // commission คำนวณจาก net slips (gross - หักคืนค้าง) + ช่วยยอดเดือนนี้
+        const totalAmount = slipAmount - totalDeducted + adjustThisMonth;
         const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
-        const outstandingDebt = debtMap.get(user.id) ?? 0;
+        const outstandingDebt = debtMap.get(uid) ?? 0;
         return {
-          userId: user.id,
+          userId: uid,
           user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount },
           visitCount: count,
-          totalAmount,
-          adjustment,      // ยอดที่ admin ช่วยเดือนนี้
+          slipAmount,          // ยอดสลิปรวม (gross)
+          totalDeducted,       // ยอดที่หักคืนจากหนี้ผ่าน slip เดือนนี้
+          adjustThisMonth,     // ยอดช่วยยอดเดือนนี้ (loan_help)
+          adjustCarryover,     // ยอดยกมา (ใช้ดูเท่านั้น — ไม่นับ commission)
+          totalAmount,         // ยอดคำนวณ = gross + ช่วยเดือนนี้
           outstandingDebt,
           reachedThreshold,
           commission,
@@ -363,7 +394,7 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [slips, settings, monthHelpAdjs, debtResult] = await Promise.all([
+    const [slips, settings, adjThisMonth, adjCarryover, prevPosResult, allNegResult] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where: {
           userId,
@@ -375,14 +406,24 @@ export class VisitsService {
       this.prisma.setting.findMany({
         where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
       }),
-      // ช่วยยอด (positive) เดือนนี้ — เหมือน getCommissionSummary
-      this.prisma.commissionAdjustment.findMany({
-        where: { userId, month, amount: { gt: 0 } },
-        select: { amount: true },
-      }),
-      // ยอดค้างรวมทั้งหมด (SUM ทุก record ไม่ filter by month)
+      // ยอดเติมเดือนนี้ loan_help เท่านั้น (บวกเข้า commission formula)
       this.prisma.commissionAdjustment.aggregate({
-        where: { userId },
+        where: { userId, month, amount: { gt: 0 }, type: 'loan_help' },
+        _sum: { amount: true },
+      }),
+      // ยอดเติมยกมา loan_help NET (เฉพาะ type loan_help เดือนก่อนๆ)
+      this.prisma.commissionAdjustment.aggregate({
+        where: { userId, month: { lt: month }, type: 'loan_help' },
+        _sum: { amount: true },
+      }),
+      // ยอดที่ต้องหักคืน (positive ทุก type, month < current)
+      this.prisma.commissionAdjustment.aggregate({
+        where: { userId, month: { lt: month }, amount: { gt: 0 } },
+        _sum: { amount: true },
+      }),
+      // ยอดหักคืนทั้งหมด (negative ทุก month)
+      this.prisma.commissionAdjustment.aggregate({
+        where: { userId, amount: { lt: 0 } },
         _sum: { amount: true },
       }),
     ]);
@@ -395,22 +436,32 @@ export class VisitsService {
     const confirmedSlips = slips.filter((s) => s.slipStatus !== 'pending_approval');
     const pendingSlips   = slips.filter((s) => s.slipStatus === 'pending_approval');
 
-    // หัก debtDeducted เหมือน getCommissionSummary
-    const slipNet      = confirmedSlips.reduce((s, v) => s + (v.amount ?? 0) - (v.debtDeducted ?? 0), 0);
+    // ยอดสลิปรวม (gross — commission คำนวณจากยอดขายจริง)
+    const slipAmount    = confirmedSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
+    const totalDeducted = confirmedSlips.reduce((s, v) => s + (v.debtDeducted ?? 0), 0);
     const pendingAmount = pendingSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
 
-    // บวกช่วยยอดเดือนนี้ เหมือน getCommissionSummary
-    const adjustment  = monthHelpAdjs.reduce((s, a) => s + a.amount, 0);
-    const totalAmount = slipNet + adjustment;
+    const adjustThisMonth = adjThisMonth._sum.amount ?? 0;
+    const adjustCarryover = adjCarryover._sum.amount ?? 0;
 
-    const outstandingDebt = Math.max(0, debtResult._sum.amount ?? 0);
+    // ยอดคำนวณ = net slips (gross - หักคืนค้าง) + ช่วยยอดเดือนนี้
+    const totalAmount = slipAmount - totalDeducted + adjustThisMonth;
+
+    // ยอดค้างจากเดือนก่อน = positive เดือนก่อน + negative ทั้งหมด
+    const outstandingDebt = Math.max(0, (prevPosResult._sum.amount ?? 0) + (allNegResult._sum.amount ?? 0));
 
     const { reachedThreshold, commission, remaining, breakdown } = calculateCommission({ totalAmount, rate, threshold, tiers });
 
     return {
-      month, visitCount: slips.length, totalAmount, pendingAmount,
+      month, visitCount: slips.length,
+      slipAmount,           // ยอดสลิปรวม (gross)
+      totalDeducted,        // ยอดที่หักคืนหนี้ผ่าน slip
+      adjustThisMonth,      // ยอดช่วยยอดเดือนนี้ (loan_help)
+      adjustCarryover,      // ยอดยกมา (ใช้ดูเท่านั้น)
+      totalAmount,          // ยอดคำนวณ = gross + ช่วยเดือนนี้
+      pendingAmount,
       confirmedCount: confirmedSlips.length, pendingCount: pendingSlips.length,
-      adjustment, outstandingDebt,
+      outstandingDebt,
       reachedThreshold, commission, remaining, breakdown, settings: { rate, threshold, tiers },
     };
   }
@@ -430,7 +481,7 @@ export class VisitsService {
         id: true, shopName: true, amount: true, debtDeducted: true,
         slipUrl: true, slipStatus: true, transRef: true, createdAt: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     });
     return slips.map((s) => ({ ...s, orderAmount: s.amount, netAmount: (s.amount ?? 0) - (s.debtDeducted ?? 0) }));
   }
@@ -487,5 +538,44 @@ export class VisitsService {
     }
 
     return updated;
+  }
+
+  async deleteVisit(id: string, userId: string, role: string) {
+    const visit = await this.prisma.visitRecord.findUnique({ where: { id } });
+    if (!visit) throw new Error('Visit not found');
+    if (role !== 'admin' && visit.userId !== userId) throw new Error('Forbidden');
+    const imageUrls: string[] = (visit as any).imageUrls ?? [];
+    for (const url of imageUrls) {
+      try {
+        const filename = url.split('/').pop();
+        if (filename) {
+          const filepath = path.join(process.cwd(), 'uploads', 'line', filename);
+          const fs = require('fs');
+          if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        }
+      } catch (e) { this.logger.warn(`Failed to delete image: ${(e as Error).message}`); }
+    }
+    await this.prisma.visitRecord.delete({ where: { id } });
+    return { success: true };
+  }
+
+  async updateVisit(id: string, userId: string, role: string, data: {
+    shopName?: string;
+    result?: string;
+    orderAmount?: number | null;
+    details?: string;
+  }) {
+    const visit = await this.prisma.visitRecord.findUnique({ where: { id } });
+    if (!visit) throw new Error('Visit not found');
+    if (role !== 'admin' && visit.userId !== userId) throw new Error('Forbidden');
+    return this.prisma.visitRecord.update({
+      where: { id },
+      data: {
+        ...(data.shopName !== undefined ? { shopName: data.shopName } : {}),
+        ...(data.result !== undefined ? { result: data.result } : {}),
+        ...(data.orderAmount !== undefined ? { orderAmount: data.orderAmount } : {}),
+        ...(data.details !== undefined ? { details: data.details } : {}),
+      },
+    });
   }
 }
