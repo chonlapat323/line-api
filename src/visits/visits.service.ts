@@ -170,6 +170,7 @@ export class VisitsService {
   async findAll(params: {
     userId: string;
     role: string;
+    roleName?: string;
     page: number;
     limit: number;
     province?: string;
@@ -184,10 +185,12 @@ export class VisitsService {
     filterUserId?: string;
   }) {
     const { userId, role, page, limit } = params;
+    const roleName = params.roleName ?? role;
     const skip = (page - 1) * limit;
 
+    const viewAll = ['admin', 'manager', 'accountant'].includes(roleName);
     const where: any = {};
-    if (role !== 'admin') where.userId = userId;
+    if (!viewAll) where.userId = userId;
     else if (params.filterUserId) where.userId = params.filterUserId;
     if (params.province) where.province = params.province;
     if (params.result) where.result = params.result;
@@ -232,9 +235,11 @@ export class VisitsService {
     return { data, total: stats.total, page, totalPages: Math.ceil(stats.total / limit), stats };
   }
 
-  async getProvinceStats(params: { userId: string; role: string; dateFrom?: string; dateTo?: string }) {
+  async getProvinceStats(params: { userId: string; role: string; roleName?: string; dateFrom?: string; dateTo?: string }) {
+    const roleName = params.roleName ?? params.role;
+    const viewAll = ['admin', 'manager', 'accountant'].includes(roleName);
     const where: any = {};
-    if (params.role !== 'admin') where.userId = params.userId;
+    if (!viewAll) where.userId = params.userId;
     if (params.dateFrom || params.dateTo) {
       where.createdAt = {};
       if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom.includes('T') ? params.dateFrom : params.dateFrom + "T00:00:00");
@@ -492,8 +497,10 @@ export class VisitsService {
     amount?: number;
     adminId: string;
     role: string;
+    roleName?: string;
   }) {
-    if (params.role !== 'admin') throw new Error('Forbidden');
+    const roleName = params.roleName ?? params.role;
+    if (!['admin', 'accountant'].includes(roleName)) throw new Error('Forbidden');
 
     const visit = await this.prisma.visitRecord.findUnique({
       where: { id: params.id },

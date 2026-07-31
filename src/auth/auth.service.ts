@@ -23,6 +23,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       roleId: user.roleId ?? null,
+      roleName: user.roleRef?.name ?? user.role,
     });
 
     let permissions: MenuPermission[] = [];

@@ -100,6 +100,7 @@ export class VisitsController {
       amount: body.amount,
       adminId: req.user.id,
       role: req.user.role,
+      roleName: req.user.roleName,
     });
   }
 
@@ -148,6 +149,7 @@ export class VisitsController {
     return this.visitsService.getProvinceStats({
       userId: req.user.id,
       role: req.user.role,
+      roleName: req.user.roleName,
       dateFrom: q.dateFrom,
       dateTo: q.dateTo,
     });
@@ -159,6 +161,7 @@ export class VisitsController {
     return this.visitsService.findAll({
       userId: req.user.id,
       role: req.user.role,
+      roleName: req.user.roleName,
       page: q.page ? parseInt(q.page) : 1,
       limit: q.limit ? parseInt(q.limit) : 100,
       province: q.province,

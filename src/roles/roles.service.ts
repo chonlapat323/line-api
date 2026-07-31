@@ -39,26 +39,60 @@ export class RolesService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    const count = await this.prisma.role.count();
-    if (count === 0) await this.seedDefaults();
+    await this.seedDefaults();
   }
 
   private async seedDefaults() {
-    const allTrue = MENUS.map((m) => ({ menu: m.menu, label: m.label, canView: true, canEdit: true, canDelete: true }));
-    const viewOnly = MENUS.map((m) => ({
-      menu: m.menu,
-      label: m.label,
-      canView: ['dashboard', 'visits', 'commissions'].includes(m.menu),
-      canEdit: false,
-      canDelete: false,
-    }));
+    const perm = (menus: string[], edit: string[] = [], del: string[] = []) =>
+      MENUS.map((m) => ({
+        menu: m.menu,
+        label: m.label,
+        canView: menus.includes(m.menu),
+        canEdit: edit.includes(m.menu),
+        canDelete: del.includes(m.menu),
+      }));
 
-    await this.prisma.role.createMany({
-      data: [
-        { name: 'admin', label: 'แอดมิน', permissions: allTrue, isSystem: true, isActive: true },
-        { name: 'user', label: 'ผู้ใช้ทั่วไป', permissions: viewOnly, isSystem: false, isActive: true },
-      ],
-    });
+    const roles = [
+      {
+        name: 'admin',
+        label: 'แอดมิน',
+        permissions: MENUS.map((m) => ({ menu: m.menu, label: m.label, canView: true, canEdit: true, canDelete: true })),
+        isSystem: true,
+        isActive: true,
+      },
+      {
+        name: 'user',
+        label: 'เซล์',
+        permissions: perm(['dashboard', 'visits', 'commissions'], ['visits']),
+        isSystem: false,
+        isActive: true,
+      },
+      {
+        name: 'manager',
+        label: 'ผู้จัดการเซล์',
+        permissions: perm(['dashboard', 'sales', 'visits', 'commissions'], ['visits']),
+        isSystem: false,
+        isActive: true,
+      },
+      {
+        name: 'accountant',
+        label: 'บัญชี',
+        permissions: perm(
+          ['dashboard', 'sales', 'visits', 'approvals', 'commissions'],
+          ['approvals', 'commissions'],
+        ),
+        isSystem: false,
+        isActive: true,
+      },
+    ];
+
+    for (const r of roles) {
+      await this.prisma.role.upsert({
+        where: { name: r.name },
+        update: { label: r.label, permissions: r.permissions, isActive: r.isActive },
+        create: r,
+      });
+    }
   }
 
   getMenus() {
