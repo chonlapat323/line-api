@@ -4,10 +4,10 @@ services:
     container_name: line_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: line_sender
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     entrypoint: ["/bin/sh", "/docker/fix-permissions.sh"]
     command: ["postgres"]
     volumes:
