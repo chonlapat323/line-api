@@ -10,6 +10,7 @@ export class CommissionAdjustmentsService {
     month: string;
     amount: number;
     note?: string;
+    type?: string;
     createdBy: string;
   }) {
     if (data.amount === 0) throw new BadRequestException('amount must not be zero');
@@ -21,6 +22,7 @@ export class CommissionAdjustmentsService {
         month: data.month,
         amount: data.amount,
         note: data.note,
+        type: data.type ?? 'loan_help',
         createdBy: data.createdBy,
       },
     });
@@ -39,6 +41,7 @@ export class CommissionAdjustmentsService {
         month: data.month,
         amount: -Math.abs(data.amount),
         note: `หักคืนยอดค้างเดือน ${data.month}`,
+        type: 'repayment',
         createdBy: data.createdBy,
       },
     });
