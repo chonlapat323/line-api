@@ -8,9 +8,12 @@ services:
       POSTGRES_DB: line_sender
     ports:
       - "5433:5432"
+    entrypoint: ["/bin/sh", "/docker/fix-permissions.sh"]
+    command: ["postgres"]
     volumes:
       - line_pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./docker/fix-permissions.sh:/docker/fix-permissions.sh:ro
     restart: unless-stopped
     stop_grace_period: 60s
     healthcheck:
