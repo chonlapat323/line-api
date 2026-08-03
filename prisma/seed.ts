@@ -422,25 +422,57 @@ async function seedMockupJuly2026() {
 }
 
 // ── Commission Adjustment Mock Data ──────────────────────────────────────────
+// ครอบคลุม 5 scenarios สำหรับทดสอบ รายงานค่าคอม
 async function seedCommissionAdjustments(adminId: string, userMap: Record<string, string>) {
-  console.log('\n── Commission Adjustments ───────────────────────');
+  console.log('\n── Commission Adjustments (5 scenarios) ────────');
 
-  const mockAdjs = [
-    // ยอดเติมเดือนนี้ (July 2026)
-    { email: 'sale.bkk1@beautyup.com',    month: '2026-07', amount: 25000, note: 'ช่วยยอดพิเศษกรุงเทพ' },
-    { email: 'sale.north1@beautyup.com',  month: '2026-07', amount: 15000, note: 'ช่วยยอด Q3 ภาคเหนือ' },
-    { email: 'sale.neast3@beautyup.com',  month: '2026-07', amount: 20000, note: 'ช่วยยอดโคราช' },
-    // ยอดยกมาจาก June 2026 — ทดสอบ deduction ผ่าน slip
-    { email: 'sale.east@beautyup.com',    month: '2026-06', amount: 30000, note: 'ช่วยยอดมิ.ย. ภาคตะวันออก' },
-    { email: 'sale.neast1@beautyup.com',  month: '2026-06', amount: 20000, note: 'ช่วยยอดมิ.ย. ขอนแก่น' },
-    { email: 'sale.south1@beautyup.com',  month: '2026-06', amount: 18000, note: 'ช่วยยอดมิ.ย. ภาคใต้' },
-    // sale.central — ยอดค้างยกมาจาก มิ.ย. (debt_carryover: ไม่บวกเข้า commission formula)
-    { email: 'sale.central@beautyup.com', month: '2026-06', amount: 80000, note: 'ยอดค้างยกมา มิ.ย. ภาคกลาง', type: 'debt_carryover' },
+  const mockAdjs: { email: string; month: string; amount: number; type: string; note: string }[] = [
+
+    // ── Scenario 1: ช่วยยอดธรรมดา ไม่มีหนี้ ──────────────────────────────
+    // sale.bkk1, sale.neast3 — ได้รับช่วยยอดแค่เดือนเดียว ไม่มียอดค้าง
+    { email: 'sale.bkk1@beautyup.com',    month: '2026-07', amount:  25000, type: 'loan_help',      note: 'ช่วยยอดพิเศษกรุงเทพ ก.ค.' },
+    { email: 'sale.neast3@beautyup.com',  month: '2026-07', amount:  20000, type: 'loan_help',      note: 'ช่วยยอดโคราช ก.ค.' },
+
+    // ── Scenario 2: ยอดค้างยกมา 1 เดือน ──────────────────────────────────
+    // sale.central — debt_carryover มิ.ย. 80,000 + ช่วยยอด ก.ค. 25,000
+    // seedDebtDeductions() จะ simulate การหักผ่าน slip 2 ใบ → ยังค้างอยู่บางส่วน
+    { email: 'sale.central@beautyup.com', month: '2026-06', amount:  80000, type: 'debt_carryover', note: 'ยอดค้างยกมา มิ.ย. ภาคกลาง' },
+    { email: 'sale.central@beautyup.com', month: '2026-07', amount:  25000, type: 'loan_help',      note: 'ช่วยยอดพิเศษ ก.ค. ภาคกลาง' },
+
+    // ── Scenario 3: ยอดค้างสะสมหลายเดือน ────────────────────────────────
+    // sale.north1 — ค้างสะสม พ.ค.+มิ.ย.+ก.ค. รวม 50,000 ยังไม่ได้ชำระ
+    { email: 'sale.north1@beautyup.com',  month: '2026-05', amount:  20000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. ภาคเหนือ 1' },
+    { email: 'sale.north1@beautyup.com',  month: '2026-06', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคเหนือ 1' },
+    { email: 'sale.north1@beautyup.com',  month: '2026-07', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด ก.ค. ภาคเหนือ 1' },
+    // sale.neast1 — ค้างสะสม 3 เดือน พ.ค.+มิ.ย.+ก.ค. รวม 45,000
+    { email: 'sale.neast1@beautyup.com',  month: '2026-05', amount:  10000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. ขอนแก่น' },
+    { email: 'sale.neast1@beautyup.com',  month: '2026-06', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ขอนแก่น' },
+    { email: 'sale.neast1@beautyup.com',  month: '2026-07', amount:  20000, type: 'loan_help',      note: 'ช่วยยอด ก.ค. ขอนแก่น' },
+
+    // ── Scenario 4: ชำระคืนเต็ม (ยอดค้าง = 0) ────────────────────────────
+    // sale.east — ช่วย มิ.ย. 30,000 → ชำระคืนครบ ก.ค.
+    { email: 'sale.east@beautyup.com',    month: '2026-06', amount:  30000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคตะวันออก' },
+    { email: 'sale.east@beautyup.com',    month: '2026-07', amount: -30000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง มิ.ย.' },
+    // sale.north2 — ช่วย พ.ค. 25,000 → ชำระคืนครบ มิ.ย.
+    { email: 'sale.north2@beautyup.com',  month: '2026-05', amount:  25000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. ภาคเหนือ 2' },
+    { email: 'sale.north2@beautyup.com',  month: '2026-06', amount: -25000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง พ.ค.' },
+
+    // ── Scenario 5: ชำระคืนบางส่วน ยังค้างอยู่ ──────────────────────────
+    // sale.neast2 — ช่วย พ.ค. 15,000 → ชำระคืน มิ.ย. 8,000 → ค้างเหลือ 7,000
+    { email: 'sale.neast2@beautyup.com',  month: '2026-05', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. อีสานกลาง' },
+    { email: 'sale.neast2@beautyup.com',  month: '2026-06', amount:  -8000, type: 'repayment',      note: 'ชำระคืนบางส่วน ยอดค้าง พ.ค.' },
+    // sale.south1 — ช่วย มิ.ย. 18,000 → ชำระคืน ก.ค. 10,000 → ค้างเหลือ 8,000
+    { email: 'sale.south1@beautyup.com',  month: '2026-06', amount:  18000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคใต้ 1' },
+    { email: 'sale.south1@beautyup.com',  month: '2026-07', amount: -10000, type: 'repayment',      note: 'ชำระคืนบางส่วน ยอดค้าง มิ.ย.' },
+
+    // ── เดือนนี้ สิงหาคม 2026 — loan_help ───────────────────────────────
+    { email: 'sale.bkk2@beautyup.com',    month: '2026-08', amount:  30000, type: 'loan_help',      note: 'ช่วยยอดสิงหาคม ปริมณฑล' },
+    { email: 'sale.south2@beautyup.com',  month: '2026-08', amount:  15000, type: 'loan_help',      note: 'ช่วยยอดสิงหาคม ภาคใต้ 2' },
   ];
 
   const mockUserIds = Object.values(userMap);
   await prisma.commissionAdjustment.deleteMany({
-    where: { userId: { in: mockUserIds }, month: { in: ['2026-06', '2026-07'] } },
+    where: { userId: { in: mockUserIds }, month: { in: ['2026-05', '2026-06', '2026-07', '2026-08'] } },
   });
 
   let count = 0;
@@ -448,10 +480,11 @@ async function seedCommissionAdjustments(adminId: string, userMap: Record<string
     const userId = userMap[adj.email];
     if (!userId) { console.log(`  ไม่พบ user: ${adj.email}`); continue; }
     await prisma.commissionAdjustment.create({
-      data: { userId, month: adj.month, amount: adj.amount, note: adj.note, createdBy: adminId, type: (adj as any).type ?? 'loan_help' },
+      data: { userId, month: adj.month, amount: adj.amount, note: adj.note, createdBy: adminId, type: adj.type },
     });
     count++;
-    console.log(`  ช่วยยอด ${adj.email.split('@')[0]}: +฿${adj.amount.toLocaleString('th-TH')} (${adj.month})`);
+    const sign = adj.amount > 0 ? '+' : '';
+    console.log(`  [${adj.type.padEnd(14)}] ${adj.email.split('@')[0].padEnd(18)} ${adj.month}  ${sign}฿${adj.amount.toLocaleString('th-TH')}`);
   }
   console.log(`  created ${count} adjustments`);
 }
@@ -559,7 +592,21 @@ async function main() {
   // 5. Mockup July 2026 — buy เยอะ + commission settings
   await seedMockupJuly2026();
 
-  // 6. Commission adjustments — ข้ามไปก่อน (เพิ่มเองผ่าน admin panel)
+  // 6. Commission adjustments — 5 scenarios (loan_help / debt_carryover / repayment)
+  const admin = createdUsers.find((u) => u.role === 'admin');
+  if (!admin) { console.log('ไม่พบ admin user'); return; }
+
+  const mockUserRecords = await prisma.user.findMany({
+    where: { email: { in: MOCKUP_USERS.map((u) => u.email) } },
+    select: { id: true, email: true },
+  });
+  const userMap: Record<string, string> = {};
+  for (const u of mockUserRecords) { userMap[u.email] = u.id; }
+
+  await seedCommissionAdjustments(admin.id, userMap);
+
+  // 7. Simulate auto-deduction via slips for sale.central (debt_carryover scenario)
+  await seedDebtDeductions(admin.id);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
