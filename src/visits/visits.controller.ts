@@ -130,6 +130,12 @@ export class VisitsController {
     return this.visitsService.getCommissionSummary(m);
   }
 
+  @Get('commission-overdue')
+  @UseGuards(JwtAuthGuard)
+  getCommissionOverdue() {
+    return this.visitsService.getOverdueCommissions();
+  }
+
   @Get('my-commission')
   @UseGuards(JwtAuthGuard)
   getMyCommission(@Request() req, @Query('month') month: string) {

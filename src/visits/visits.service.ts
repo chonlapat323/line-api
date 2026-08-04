@@ -394,6 +394,48 @@ export class VisitsService {
     return { month, settings: { rate, threshold, tiers }, summary };
   }
 
+  async getOverdueCommissions() {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // หาเดือนที่มี verified/approved slips จริง (ย้อนหลังสูงสุด 12 เดือน)
+    const activeRows = await this.prisma.$queryRaw<{ month: string }[]>`
+      SELECT DISTINCT TO_CHAR("createdAt" AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') AS month
+      FROM "SlipSubmission"
+      WHERE "slipStatus" IN ('verified', 'approved')
+        AND TO_CHAR("createdAt" AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') < ${currentMonth}
+      ORDER BY month DESC
+      LIMIT 12
+    `;
+
+    const activeMonths = activeRows.map((r) => r.month);
+    if (activeMonths.length === 0) return [];
+
+    // ดึง payments ทั้งหมดของเดือนเหล่านั้นในครั้งเดียว
+    const payments = await this.prisma.commissionPayment.findMany({
+      where: { month: { in: activeMonths } },
+      select: { userId: true, month: true },
+    });
+    const paidSet = new Set(payments.map((p) => `${p.userId}::${p.month}`));
+
+    const results: any[] = [];
+
+    for (const month of activeMonths) {
+      const { summary } = await this.getCommissionSummary(month);
+      const [y, m] = month.split('-').map(Number);
+      const [cy, cm] = currentMonth.split('-').map(Number);
+      const monthsAgo = (cy - y) * 12 + (cm - m);
+
+      for (const row of summary) {
+        if (row.reachedThreshold && !paidSet.has(`${row.userId}::${month}`)) {
+          results.push({ ...row, month, monthsAgo });
+        }
+      }
+    }
+
+    return results;
+  }
+
   async getMyCommission(userId: string, month: string) {
     const [year, monthNum] = month.split('-').map(Number);
     const dateFrom = new Date(year, monthNum - 1, 1);
