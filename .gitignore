@@ -3,5 +3,6 @@ dist
 .env
 uploads
 prisma/update-role.ts
+prisma/cleanup-mock.ts
 *.json.key
 beautyup-*.json

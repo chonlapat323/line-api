@@ -538,6 +538,105 @@ async function seedDebtDeductions(adminId: string) {
   console.log(`  หักรวม ฿${totalDeducted.toLocaleString('th-TH')} / ยอดค้างเหลือ ฿${remainingDebt.toLocaleString('th-TH')}`);
 }
 
+// ── June 2026 Slips + Payments (สร้าง SlipSubmission มิ.ย. → บางคนค้างจ่าย 2 เดือน) ──
+async function seedJuneSlipsAndPayments(adminId: string, userMap: Record<string, string>) {
+  console.log('\n── June 2026 Slips + Payments ────────────────────');
+
+  const MONTH      = '2026-06';
+  const mockIds    = Object.values(userMap);
+  const dateFrom   = new Date(2026, 5, 1);
+  const dateTo     = new Date(2026, 5, 30, 23, 59, 59);
+
+  await prisma.slipSubmission.deleteMany({ where: { userId: { in: mockIds }, createdAt: { gte: dateFrom, lte: dateTo } } });
+  await prisma.commissionPayment.deleteMany({ where: { userId: { in: mockIds }, month: MONTH } });
+
+  // 5 คนที่มียอดสลิปรวมถึงเป้า ฿30,000
+  const juneSlips: { email: string; amounts: number[] }[] = [
+    { email: 'sale.bkk1@beautyup.com',    amounts: [15000, 12000, 10000] }, // 37,000
+    { email: 'sale.north1@beautyup.com',  amounts: [20000, 18000] },        // 38,000
+    { email: 'sale.central@beautyup.com', amounts: [25000, 15000] },        // 40,000
+    { email: 'sale.neast1@beautyup.com',  amounts: [16000, 15000] },        // 31,000
+    { email: 'sale.south1@beautyup.com',  amounts: [18000, 16000] },        // 34,000
+  ];
+
+  let slipCount = 0;
+  for (const ud of juneSlips) {
+    const userId = userMap[ud.email];
+    if (!userId) continue;
+    for (let i = 0; i < ud.amounts.length; i++) {
+      await prisma.slipSubmission.create({
+        data: {
+          userId,
+          shopName: 'ร้านลูกค้า มิ.ย.',
+          amount:   ud.amounts[i],
+          slipStatus: 'verified',
+          slipUrl:  `https://picsum.photos/400/300?random=${slipCount + 100}`,
+          transRef: `TXN2606${String(slipCount + 1).padStart(4, '0')}`,
+          createdAt: new Date(2026, 5, randInt(1, 28), randInt(8, 17), randInt(0, 59)),
+        },
+      });
+      slipCount++;
+    }
+    const total = ud.amounts.reduce((s, a) => s + a, 0);
+    console.log(`  slip: ${ud.email.split('@')[0].padEnd(20)} ฿${total.toLocaleString('th-TH')} (${ud.amounts.length} ใบ)`);
+  }
+
+  // จ่ายค่าคอมให้ 2 คน → อีก 3 คนค้างจ่าย 2 เดือน
+  const paidInJune = [
+    { email: 'sale.bkk1@beautyup.com',   amount: 1110, note: 'โอนค่าคอม มิ.ย. 2569' },
+    { email: 'sale.north1@beautyup.com',  amount: 1140, note: 'โอนค่าคอม มิ.ย. 2569' },
+  ];
+
+  let payCount = 0;
+  for (const p of paidInJune) {
+    const userId = userMap[p.email];
+    if (!userId) continue;
+    await prisma.commissionPayment.upsert({
+      where:  { userId_month: { userId, month: MONTH } },
+      update: { amount: p.amount, note: p.note },
+      create: { userId, month: MONTH, amount: p.amount, paidBy: adminId, note: p.note },
+    });
+    payCount++;
+    console.log(`  จ่ายแล้ว: ${p.email.split('@')[0].padEnd(20)} ฿${p.amount.toLocaleString('th-TH')}`);
+  }
+  console.log(`  จ่ายแล้ว ${payCount} คน | ค้างจ่าย ${juneSlips.length - payCount} คน (monthsAgo=2)`);
+}
+
+// ── July 2026 Commission Payments (บันทึกจ่ายจริง 4 คน → ส่วนที่เหลือ = ค้างจ่าย) ──
+async function seedJulyCommissionPayments(adminId: string, userMap: Record<string, string>) {
+  console.log('\n── July 2026 Commission Payments ─────────────────');
+
+  const MONTH = '2026-07';
+
+  const mockUserIds = Object.values(userMap);
+  await prisma.commissionPayment.deleteMany({
+    where: { userId: { in: mockUserIds }, month: MONTH },
+  });
+
+  // 4 คนที่จ่ายแล้ว — ส่วนที่เหลือ (7 คน) ยังค้างจ่าย
+  const paid = [
+    { email: 'sale.bkk1@beautyup.com',    amount: 2100, note: 'โอนผ่านธนาคาร ก.ค. 2569' },
+    { email: 'sale.north2@beautyup.com',   amount: 1650, note: 'โอนผ่านธนาคาร ก.ค. 2569' },
+    { email: 'sale.east@beautyup.com',     amount: 1950, note: 'โอนผ่านธนาคาร ก.ค. 2569' },
+    { email: 'sale.south2@beautyup.com',   amount: 1200, note: 'โอนผ่านธนาคาร ก.ค. 2569' },
+  ];
+
+  let count = 0;
+  for (const p of paid) {
+    const userId = userMap[p.email];
+    if (!userId) { console.log(`  ไม่พบ user: ${p.email}`); continue; }
+    await prisma.commissionPayment.upsert({
+      where:  { userId_month: { userId, month: MONTH } },
+      update: { amount: p.amount, note: p.note },
+      create: { userId, month: MONTH, amount: p.amount, paidBy: adminId, note: p.note },
+    });
+    count++;
+    console.log(`  จ่ายแล้ว: ${p.email.split('@')[0].padEnd(20)} ฿${p.amount.toLocaleString('th-TH')}`);
+  }
+  const outstanding = Object.keys(userMap).length - count;
+  console.log(`  จ่ายแล้ว ${count} คน | ยังค้างจ่าย ${outstanding} คน`);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('Seeding...\n');
@@ -607,6 +706,12 @@ async function main() {
 
   // 7. Simulate auto-deduction via slips for sale.central (debt_carryover scenario)
   await seedDebtDeductions(admin.id);
+
+  // 8. June slips + payments — 2 paid, 3 overdue (monthsAgo=2)
+  await seedJuneSlipsAndPayments(admin.id, userMap);
+
+  // 9. July commission payments — 4 paid, 7 outstanding (monthsAgo=1)
+  await seedJulyCommissionPayments(admin.id, userMap);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
