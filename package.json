@@ -8,7 +8,7 @@
     "build": "nest build",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
-    "seed": "npx tsx prisma/seed.ts",
+    "seed": "npx --yes tsx prisma/seed.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
