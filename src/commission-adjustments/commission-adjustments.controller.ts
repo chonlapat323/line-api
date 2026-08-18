@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Body, Query, Param, Request, UseGuards } from '@nestjs/common';
 import { CommissionAdjustmentsService } from './commission-adjustments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('commission-adjustments')
 @UseGuards(JwtAuthGuard)
@@ -13,6 +15,17 @@ export class CommissionAdjustmentsController {
     @Request() req: any,
   ) {
     return this.service.create({ ...body, createdBy: req.user.id });
+  }
+
+  @Post('apply-debt')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canEdit' })
+  applyDebt(
+    @Body() body: { userId: string; month: string },
+    @Request() req: any,
+  ) {
+    return this.service.applyDebtToExistingSlips(body.userId, req.user.id, body.month)
+      .then((applied) => ({ applied }));
   }
 
   @Get('outstanding')
