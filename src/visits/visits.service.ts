@@ -302,10 +302,10 @@ export class VisitsService {
         where: { month, amount: { gt: 0 }, type: 'loan_help' },
         _sum: { amount: true },
       }),
-      // ยอดเติมยกมา loan_help NET (บวกลบรวม — เฉพาะ type loan_help เดือนก่อนๆ)
+      // ยอดเติมยกมา NET: loan_help + repayment เดือนก่อนๆ (netted against past repayments)
       this.prisma.commissionAdjustment.groupBy({
         by: ['userId'],
-        where: { month: { lt: month }, type: 'loan_help' },
+        where: { month: { lt: month }, type: { in: ['loan_help', 'repayment'] } },
         _sum: { amount: true },
       }),
     ]);
@@ -370,8 +370,8 @@ export class VisitsService {
       .map(([uid, { user, count, slipAmount, totalDeducted, pendingCount }]) => {
         const adjustThisMonth = adjThisMonthMap.get(uid) ?? 0;
         const adjustCarryover = adjCarryoverMap.get(uid) ?? 0;
-        // commission คำนวณจาก net slips (gross - หักคืนค้าง) + ช่วยยอดเดือนนี้
-        const totalAmount = slipAmount - totalDeducted + adjustThisMonth;
+        // commission คำนวณจาก net slips (gross - หักคืนค้าง) + ช่วยยอดยกมา + ช่วยยอดเดือนนี้
+        const totalAmount = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
         const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
         const outstandingDebt = debtMap.get(uid) ?? 0;
         return {
@@ -381,8 +381,8 @@ export class VisitsService {
           slipAmount,          // ยอดสลิปรวม (gross)
           totalDeducted,       // ยอดที่หักคืนจากหนี้ผ่าน slip เดือนนี้
           adjustThisMonth,     // ยอดช่วยยอดเดือนนี้ (loan_help)
-          adjustCarryover,     // ยอดยกมา (ใช้ดูเท่านั้น — ไม่นับ commission)
-          totalAmount,         // ยอดคำนวณ = gross + ช่วยเดือนนี้
+          adjustCarryover,     // ยอดยกมา (loan_help เดือนก่อนๆ สุทธิ)
+          totalAmount,         // ยอดคำนวณ = gross + ยกมา + ช่วยเดือนนี้
           outstandingDebt,
           reachedThreshold,
           commission,
@@ -458,9 +458,9 @@ export class VisitsService {
         where: { userId, month, amount: { gt: 0 }, type: 'loan_help' },
         _sum: { amount: true },
       }),
-      // ยอดเติมยกมา loan_help NET (เฉพาะ type loan_help เดือนก่อนๆ)
+      // ยอดเติมยกมา NET: loan_help + repayment เดือนก่อนๆ (netted against past repayments)
       this.prisma.commissionAdjustment.aggregate({
-        where: { userId, month: { lt: month }, type: 'loan_help' },
+        where: { userId, month: { lt: month }, type: { in: ['loan_help', 'repayment'] } },
         _sum: { amount: true },
       }),
       // ยอดที่ต้องหักคืน (positive ทุก type, month < current)
@@ -491,8 +491,8 @@ export class VisitsService {
     const adjustThisMonth = adjThisMonth._sum.amount ?? 0;
     const adjustCarryover = adjCarryover._sum.amount ?? 0;
 
-    // ยอดคำนวณ = net slips (gross - หักคืนค้าง) + ช่วยยอดเดือนนี้
-    const totalAmount = slipAmount - totalDeducted + adjustThisMonth;
+    // ยอดคำนวณ = net slips (gross - หักคืนค้าง) + ช่วยยอดยกมา + ช่วยยอดเดือนนี้
+    const totalAmount = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
 
     // ยอดค้างจากเดือนก่อน = positive เดือนก่อน + negative ทั้งหมด
     const outstandingDebt = Math.max(0, (prevPosResult._sum.amount ?? 0) + (allNegResult._sum.amount ?? 0));
@@ -504,8 +504,8 @@ export class VisitsService {
       slipAmount,           // ยอดสลิปรวม (gross)
       totalDeducted,        // ยอดที่หักคืนหนี้ผ่าน slip
       adjustThisMonth,      // ยอดช่วยยอดเดือนนี้ (loan_help)
-      adjustCarryover,      // ยอดยกมา (ใช้ดูเท่านั้น)
-      totalAmount,          // ยอดคำนวณ = gross + ช่วยเดือนนี้
+      adjustCarryover,      // ยอดยกมาสุทธิ (นับใน formula)
+      totalAmount,          // ยอดคำนวณ = gross + ยกมาสุทธิ + ช่วยเดือนนี้
       pendingAmount,
       confirmedCount: confirmedSlips.length, pendingCount: pendingSlips.length,
       outstandingDebt,

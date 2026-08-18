@@ -739,15 +739,16 @@ async function seedAugust2026(adminId: string, userMap: Record<string, string>) 
   // ────────────────────────────────────────────────────────────────────
   // 1. sale.bkk1 — หักหนี้ ก.ค. 25,000 จาก slip ส.ค. + ถึงเป้า + จ่ายแล้ว
   //    slips: 35,000+28,000=63,000 | debtDeducted=25,000 บน slip แรก
-  //    net = 63,000-25,000 = 38,000 → tier 3% → 38,000*3% = 1,140
+  //    adjustCarryover=+25,000 (ก.ค. ยังไม่ netted, repayment tagged ส.ค.)
+  //    totalAmount = 63,000-25,000+25,000 = 63,000 → tier 5% → 63,000*5% = 3,150
   // ────────────────────────────────────────────────────────────────────
   await prisma.slipSubmission.createMany({ data: [
     slip('sale.bkk1@beautyup.com', 'ร้านสาขาลาดพร้าว',   35000, 'verified', 'AUG01A', 3, 25000),
     slip('sale.bkk1@beautyup.com', 'ร้านสาขาบางนา',      28000, 'verified', 'AUG01B', 8),
   ]});
   await prisma.commissionAdjustment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: -25000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. จาก slip AUG01A', createdBy: adminId } });
-  await prisma.commissionPayment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: 1140, paidBy: adminId, note: 'โอนแล้ว' } });
-  console.log('  [1] sale.bkk1 → slips 63k deduct 25k → net 38k → ฿1,140 จ่ายแล้ว | ค้าง 0');
+  await prisma.commissionPayment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: 3150, paidBy: adminId, note: 'โอนแล้ว' } });
+  console.log('  [1] sale.bkk1 → slips 63k deduct 25k → carryover 25k → gross 63k → tier 5% ฿3,150 จ่ายแล้ว');
 
   // ────────────────────────────────────────────────────────────────────
   // 2. sale.bkk2 — ถึงเป้า + รอจ่าย (tier 7%) totalAmount=92,000
@@ -826,15 +827,15 @@ async function seedAugust2026(adminId: string, userMap: Record<string, string>) 
 
   // ────────────────────────────────────────────────────────────────────
   // 9. sale.neast3 — ไม่มีข้อมูลธนาคาร + หักหนี้ ก.ค. 20,000 จาก slip ส.ค.
-  //    slips: 60,000 | debtDeducted=20,000 บน slip
-  //    net = 60,000-20,000 = 40,000 → tier 3% → 40,000*3% = 1,200 แต่โอนไม่ได้
+  //    slips: 60,000 | debtDeducted=20,000 | adjustCarryover=+20,000 (ก.ค., repayment ส.ค.)
+  //    totalAmount = 60,000-20,000+20,000 = 60,000 → tier 5% → 60,000*5% = 3,000 แต่โอนไม่ได้
   // ────────────────────────────────────────────────────────────────────
   await prisma.user.updateMany({ where: { email: 'sale.neast3@beautyup.com' }, data: { bankName: null, bankAccount: null } });
   await prisma.slipSubmission.createMany({ data: [
     slip('sale.neast3@beautyup.com', 'ร้านนครราชสีมาเซ็นทรัล', 60000, 'verified', 'AUG09A', 11, 20000),
   ]});
   await prisma.commissionAdjustment.create({ data: { userId: uid('sale.neast3@beautyup.com'), month: MONTH, amount: -20000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. จาก slip AUG09A', createdBy: adminId } });
-  console.log('  [9] sale.neast3 → slips 60k deduct 20k → net 40k → ฿1,200 ไม่มีบัญชี | ค้าง 0');
+  console.log('  [9] sale.neast3 → slips 60k deduct 20k → carryover 20k → gross 60k → tier 5% ฿3,000 ไม่มีบัญชี');
 
   // ────────────────────────────────────────────────────────────────────
   // 10. sale.south1 — ยอดสูง tier 7% (>80k) + จ่ายแล้ว | outstandingDebt = 0 (ชำระครบใน ก.ค.)
