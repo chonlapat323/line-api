@@ -449,24 +449,19 @@ async function seedCommissionAdjustments(adminId: string, userMap: Record<string
     { email: 'sale.neast1@beautyup.com',  month: '2026-06', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ขอนแก่น' },
     { email: 'sale.neast1@beautyup.com',  month: '2026-07', amount:  20000, type: 'loan_help',      note: 'ช่วยยอด ก.ค. ขอนแก่น' },
 
-    // ── Scenario 4: ชำระคืนเต็ม (ยอดค้าง = 0) ────────────────────────────
-    // sale.east — ช่วย มิ.ย. 30,000 → ชำระคืนครบ ก.ค. (ได้คอม ก.ค. ไม่มี loan_help ใหม่ → ยอดค้าง = 0)
+    // ── Scenario 4: ชำระคืนครบ ผ่าน slip deduction ──────────────────────
+    // sale.east — ช่วย มิ.ย. 30,000 → หักจาก slip ก.ค. (seedJulyDebtDeductions)
     { email: 'sale.east@beautyup.com',    month: '2026-06', amount:  30000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคตะวันออก' },
-    { email: 'sale.east@beautyup.com',    month: '2026-07', amount: -30000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง มิ.ย.' },
-    // sale.north2 — ช่วย ก.ค. 20,000 → ชำระบางส่วนผ่าน slip deduction ส.ค. 8,000 → ค้างเหลือ 12,000
+    // sale.north2 — ช่วย ก.ค. 20,000 → หักบางส่วนจาก slip ส.ค. 8,000 (seedAugust2026)
     { email: 'sale.north2@beautyup.com',  month: '2026-07', amount:  20000, type: 'loan_help',      note: 'ช่วยยอด ก.ค. ภาคเหนือ 2' },
 
-    // ── Scenario 5: ชำระคืนบางส่วน ยังค้างอยู่ ──────────────────────────
-    // sale.neast2 — ช่วย พ.ค. 15,000 → ชำระคืน มิ.ย. 8,000 → ค้างเหลือ 7,000
+    // ── Scenario 5: ชำระคืนบางส่วน / ผ่าน slip deduction ────────────────
+    // sale.neast2 — ช่วย พ.ค. 15,000 → หัก 8,000 จาก slip มิ.ย. (seedJuneSlipsAndPayments)
     { email: 'sale.neast2@beautyup.com',  month: '2026-05', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. อีสานกลาง' },
-    { email: 'sale.neast2@beautyup.com',  month: '2026-06', amount:  -8000, type: 'repayment',      note: 'ชำระคืนบางส่วน ยอดค้าง พ.ค.' },
-    // sale.south1 — ช่วย มิ.ย. 18,000 → ชำระคืนครบ ก.ค. (ได้คอม ก.ค. ไม่มี loan_help ใหม่ → ยอดค้าง = 0)
+    // sale.south1 — ช่วย มิ.ย. 18,000 → หักจาก slip ก.ค. (seedJulyDebtDeductions)
     { email: 'sale.south1@beautyup.com',  month: '2026-06', amount:  18000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคใต้ 1' },
-    { email: 'sale.south1@beautyup.com',  month: '2026-07', amount: -18000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง มิ.ย.' },
-    // sale.bkk1 — ช่วย ก.ค. 25,000 → ชำระคืนครบ ส.ค. (ได้คอม ส.ค. ไม่มี loan_help ใหม่ → ยอดค้าง = 0)
-    // (repayment ส.ค. สร้างใน seedAugust2026 เพื่อหลีกเลี่ยง deleteMany conflict)
-    // sale.neast3 — ช่วย ก.ค. 20,000 → ชำระคืนครบ ส.ค. (ไม่มีบัญชีธนาคาร → ยอดค้าง = 0)
-    // (repayment ส.ค. สร้างใน seedAugust2026)
+    // sale.bkk1 — ช่วย ก.ค. 25,000 → หักจาก slip ส.ค. (seedAugust2026)
+    // sale.neast3 — ช่วย ก.ค. 20,000 → หักจาก slip ส.ค. (seedAugust2026)
   ];
 
   const mockUserIds = Object.values(userMap);
@@ -551,13 +546,14 @@ async function seedJuneSlipsAndPayments(adminId: string, userMap: Record<string,
   await prisma.slipSubmission.deleteMany({ where: { userId: { in: mockIds }, createdAt: { gte: dateFrom, lte: dateTo } } });
   await prisma.commissionPayment.deleteMany({ where: { userId: { in: mockIds }, month: MONTH } });
 
-  // 5 คนที่มียอดสลิปรวมถึงเป้า ฿30,000
+  // มิ.ย.: bkk1/north1/central/neast1/south1 ถึงเป้า + neast2 มี slip พอหักหนี้
   const juneSlips: { email: string; amounts: number[] }[] = [
     { email: 'sale.bkk1@beautyup.com',    amounts: [15000, 12000, 10000] }, // 37,000
     { email: 'sale.north1@beautyup.com',  amounts: [20000, 18000] },        // 38,000
     { email: 'sale.central@beautyup.com', amounts: [25000, 15000] },        // 40,000
     { email: 'sale.neast1@beautyup.com',  amounts: [16000, 15000] },        // 31,000
     { email: 'sale.south1@beautyup.com',  amounts: [18000, 16000] },        // 34,000
+    { email: 'sale.neast2@beautyup.com',  amounts: [20000] },               // 20,000 (สำหรับหักหนี้ 8,000)
   ];
 
   let slipCount = 0;
@@ -582,6 +578,26 @@ async function seedJuneSlipsAndPayments(adminId: string, userMap: Record<string,
     console.log(`  slip: ${ud.email.split('@')[0].padEnd(20)} ฿${total.toLocaleString('th-TH')} (${ud.amounts.length} ใบ)`);
   }
 
+  // หักหนี้ neast2 มิ.ย. 8,000 จาก slip (ยอดค้าง พ.ค. 15,000 → เหลือ 7,000)
+  const neast2Id = userMap['sale.neast2@beautyup.com'];
+  if (neast2Id) {
+    const neast2Slip = await prisma.slipSubmission.findFirst({
+      where: { userId: neast2Id, createdAt: { gte: dateFrom, lte: dateTo } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (neast2Slip) {
+      await prisma.slipSubmission.update({ where: { id: neast2Slip.id }, data: { debtDeducted: 8000 } });
+      await prisma.commissionAdjustment.create({
+        data: {
+          userId: neast2Id, month: MONTH, amount: -8000, type: 'repayment',
+          note: `หักคืนยอดค้าง พ.ค. จาก slip #${neast2Slip.id.slice(-6)}`,
+          createdBy: adminId, createdAt: new Date(2026, 5, 15, 10, 0, 0),
+        },
+      });
+      console.log(`  deduct: sale.neast2 → slip ฿20,000 deductDeducted=8,000 → ค้างเหลือ ฿7,000`);
+    }
+  }
+
   // จ่ายค่าคอมให้ 2 คน → อีก 3 คนค้างจ่าย 2 เดือน
   const paidInJune = [
     { email: 'sale.bkk1@beautyup.com',   amount: 1110, note: 'โอนค่าคอม มิ.ย. 2569' },
@@ -601,6 +617,56 @@ async function seedJuneSlipsAndPayments(adminId: string, userMap: Record<string,
     console.log(`  จ่ายแล้ว: ${p.email.split('@')[0].padEnd(20)} ฿${p.amount.toLocaleString('th-TH')}`);
   }
   console.log(`  จ่ายแล้ว ${payCount} คน | ค้างจ่าย ${juneSlips.length - payCount} คน (monthsAgo=2)`);
+}
+
+// ── July 2026 Debt Deductions (หักหนี้ผ่าน slip ก.ค.) ────────────────────────────
+async function seedJulyDebtDeductions(adminId: string, userMap: Record<string, string>) {
+  console.log('\n── July 2026 Debt Deductions (via slip) ──────────────────');
+
+  const targets = [
+    { email: 'sale.east@beautyup.com',   debtAmount: 30000, debtMonth: '2026-06' },
+    { email: 'sale.south1@beautyup.com', debtAmount: 18000, debtMonth: '2026-06' },
+  ];
+
+  const julyFrom = new Date(2026, 6, 1);
+  const julyTo   = new Date(2026, 6, 31, 23, 59, 59);
+
+  for (const { email, debtAmount, debtMonth } of targets) {
+    const userId = userMap[email];
+    if (!userId) continue;
+
+    // Reset previous deductions (idempotent)
+    await prisma.slipSubmission.updateMany({
+      where: { userId, createdAt: { gte: julyFrom, lte: julyTo } },
+      data: { debtDeducted: 0 },
+    });
+    await prisma.commissionAdjustment.deleteMany({
+      where: { userId, month: '2026-07', amount: { lt: 0 } },
+    });
+
+    const slips = await prisma.slipSubmission.findMany({
+      where: { userId, createdAt: { gte: julyFrom, lte: julyTo }, slipStatus: { in: ['verified', 'approved'] } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let remaining = debtAmount;
+    let totalDeducted = 0;
+    for (const slip of slips) {
+      if (remaining <= 0) break;
+      const deductAmount = Math.min(remaining, slip.amount);
+      await prisma.slipSubmission.update({ where: { id: slip.id }, data: { debtDeducted: deductAmount } });
+      await prisma.commissionAdjustment.create({
+        data: {
+          userId, month: '2026-07', amount: -deductAmount, type: 'repayment',
+          note: `หักคืนยอดค้าง ${debtMonth} จาก slip #${slip.id.slice(-6)}`,
+          createdBy: adminId, createdAt: new Date(2026, 6, 15, 10, 0, 0),
+        },
+      });
+      remaining -= deductAmount;
+      totalDeducted += deductAmount;
+    }
+    console.log(`  ${email.split('@')[0].padEnd(18)} หัก ฿${totalDeducted.toLocaleString('th-TH')} | ค้างเหลือ ฿${remaining.toLocaleString('th-TH')}`);
+  }
 }
 
 // ── July 2026 Commission Payments (บันทึกจ่ายจริง 4 คน → ส่วนที่เหลือ = ค้างจ่าย) ──
@@ -671,17 +737,17 @@ async function seedAugust2026(adminId: string, userMap: Record<string, string>) 
   }
 
   // ────────────────────────────────────────────────────────────────────
-  // 1. sale.bkk1 — ถึงเป้า + จ่ายแล้ว + ชำระคืนยอดค้าง ก.ค.
-  //    slips: 38,000 verified → tier 3% flat → 38,000*3% = 1,140
-  //    repayment -25,000 (ยอดค้าง ก.ค.) → outstandingDebt = 0 ✓
+  // 1. sale.bkk1 — หักหนี้ ก.ค. 25,000 จาก slip ส.ค. + ถึงเป้า + จ่ายแล้ว
+  //    slips: 35,000+28,000=63,000 | debtDeducted=25,000 บน slip แรก
+  //    net = 63,000-25,000 = 38,000 → tier 3% → 38,000*3% = 1,140
   // ────────────────────────────────────────────────────────────────────
   await prisma.slipSubmission.createMany({ data: [
-    slip('sale.bkk1@beautyup.com', 'ร้านสาขาลาดพร้าว',   20000, 'verified', 'AUG01A', 3),
-    slip('sale.bkk1@beautyup.com', 'ร้านสาขาบางนา',      18000, 'verified', 'AUG01B', 8),
+    slip('sale.bkk1@beautyup.com', 'ร้านสาขาลาดพร้าว',   35000, 'verified', 'AUG01A', 3, 25000),
+    slip('sale.bkk1@beautyup.com', 'ร้านสาขาบางนา',      28000, 'verified', 'AUG01B', 8),
   ]});
-  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: -25000, type: 'repayment', note: 'ชำระคืนครบ ยอดค้าง ก.ค.', createdBy: adminId } });
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: -25000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. จาก slip AUG01A', createdBy: adminId } });
   await prisma.commissionPayment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: 1140, paidBy: adminId, note: 'โอนแล้ว' } });
-  console.log('  [1] sale.bkk1 → ถึงเป้า ฿1,140 จ่ายแล้ว | repayment -25,000 → ค้าง 0');
+  console.log('  [1] sale.bkk1 → slips 63k deduct 25k → net 38k → ฿1,140 จ่ายแล้ว | ค้าง 0');
 
   // ────────────────────────────────────────────────────────────────────
   // 2. sale.bkk2 — ถึงเป้า + รอจ่าย (tier 7%) totalAmount=92,000
@@ -759,16 +825,16 @@ async function seedAugust2026(adminId: string, userMap: Record<string, string>) 
   console.log('  [8] sale.neast2 → ช่วยยอด 8,000 รวม 23,000 ยังไม่ถึงเป้า');
 
   // ────────────────────────────────────────────────────────────────────
-  // 9. sale.neast3 — ไม่มีข้อมูลธนาคาร (UI แสดง warning) + ชำระคืนยอดค้าง ก.ค.
-  //    verified: 40,000 → tier 3% flat → 40,000*3% = 1,200 แต่โอนไม่ได้ไม่มีบัญชี
-  //    repayment -20,000 (ยอดค้าง ก.ค.) → outstandingDebt = 0 ✓
+  // 9. sale.neast3 — ไม่มีข้อมูลธนาคาร + หักหนี้ ก.ค. 20,000 จาก slip ส.ค.
+  //    slips: 60,000 | debtDeducted=20,000 บน slip
+  //    net = 60,000-20,000 = 40,000 → tier 3% → 40,000*3% = 1,200 แต่โอนไม่ได้
   // ────────────────────────────────────────────────────────────────────
   await prisma.user.updateMany({ where: { email: 'sale.neast3@beautyup.com' }, data: { bankName: null, bankAccount: null } });
   await prisma.slipSubmission.createMany({ data: [
-    slip('sale.neast3@beautyup.com', 'ร้านนครราชสีมาเซ็นทรัล', 40000, 'verified', 'AUG09A', 11),
+    slip('sale.neast3@beautyup.com', 'ร้านนครราชสีมาเซ็นทรัล', 60000, 'verified', 'AUG09A', 11, 20000),
   ]});
-  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.neast3@beautyup.com'), month: MONTH, amount: -20000, type: 'repayment', note: 'ชำระคืนครบ ยอดค้าง ก.ค.', createdBy: adminId } });
-  console.log('  [9] sale.neast3 → ไม่มีบัญชี ฿1,200 | repayment -20,000 → ค้าง 0');
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.neast3@beautyup.com'), month: MONTH, amount: -20000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. จาก slip AUG09A', createdBy: adminId } });
+  console.log('  [9] sale.neast3 → slips 60k deduct 20k → net 40k → ฿1,200 ไม่มีบัญชี | ค้าง 0');
 
   // ────────────────────────────────────────────────────────────────────
   // 10. sale.south1 — ยอดสูง tier 7% (>80k) + จ่ายแล้ว | outstandingDebt = 0 (ชำระครบใน ก.ค.)
@@ -900,13 +966,16 @@ async function main() {
   // 8. June slips + payments — 2 paid, 3 overdue (monthsAgo=2)
   await seedJuneSlipsAndPayments(admin.id, userMap);
 
-  // 9. July commission payments — 4 paid, 7 outstanding (monthsAgo=1)
+  // 9. July debt deductions via slips (east -30k, south1 -18k)
+  await seedJulyDebtDeductions(admin.id, userMap);
+
+  // 10. July commission payments — 4 paid, 7 outstanding (monthsAgo=1)
   await seedJulyCommissionPayments(admin.id, userMap);
 
-  // 10. August 2026 — ครอบทุกเงื่อนไข commission (11 scenarios)
+  // 11. August 2026 — ครอบทุกเงื่อนไข commission (11 scenarios)
   await seedAugust2026(admin.id, userMap);
 
-  // 11. Today pending slips — 3 รายการรออนุมัติวันนี้
+  // 12. Today pending slips — 3 รายการรออนุมัติวันนี้
   await seedTodayPendingSlips(userMap);
 }
 
