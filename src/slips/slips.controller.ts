@@ -37,6 +37,7 @@ export class SlipsController {
     return this.slipsService.findAll({
       userId: req.user.id,
       role: req.user.role,
+      roleId: req.user.roleId,
       filterUserId: q.filterUserId,
       status: q.status,
       search: q.search,

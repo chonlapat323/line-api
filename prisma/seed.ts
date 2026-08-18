@@ -450,24 +450,23 @@ async function seedCommissionAdjustments(adminId: string, userMap: Record<string
     { email: 'sale.neast1@beautyup.com',  month: '2026-07', amount:  20000, type: 'loan_help',      note: 'ช่วยยอด ก.ค. ขอนแก่น' },
 
     // ── Scenario 4: ชำระคืนเต็ม (ยอดค้าง = 0) ────────────────────────────
-    // sale.east — ช่วย มิ.ย. 30,000 → ชำระคืนครบ ก.ค.
+    // sale.east — ช่วย มิ.ย. 30,000 → ชำระคืนครบ ก.ค. (ได้คอม ก.ค. ไม่มี loan_help ใหม่ → ยอดค้าง = 0)
     { email: 'sale.east@beautyup.com',    month: '2026-06', amount:  30000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคตะวันออก' },
     { email: 'sale.east@beautyup.com',    month: '2026-07', amount: -30000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง มิ.ย.' },
-    // sale.north2 — ช่วย พ.ค. 25,000 → ชำระคืนครบ มิ.ย.
-    { email: 'sale.north2@beautyup.com',  month: '2026-05', amount:  25000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. ภาคเหนือ 2' },
-    { email: 'sale.north2@beautyup.com',  month: '2026-06', amount: -25000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง พ.ค.' },
+    // sale.north2 — ช่วย ก.ค. 20,000 → ชำระบางส่วนผ่าน slip deduction ส.ค. 8,000 → ค้างเหลือ 12,000
+    { email: 'sale.north2@beautyup.com',  month: '2026-07', amount:  20000, type: 'loan_help',      note: 'ช่วยยอด ก.ค. ภาคเหนือ 2' },
 
     // ── Scenario 5: ชำระคืนบางส่วน ยังค้างอยู่ ──────────────────────────
     // sale.neast2 — ช่วย พ.ค. 15,000 → ชำระคืน มิ.ย. 8,000 → ค้างเหลือ 7,000
     { email: 'sale.neast2@beautyup.com',  month: '2026-05', amount:  15000, type: 'loan_help',      note: 'ช่วยยอด พ.ค. อีสานกลาง' },
     { email: 'sale.neast2@beautyup.com',  month: '2026-06', amount:  -8000, type: 'repayment',      note: 'ชำระคืนบางส่วน ยอดค้าง พ.ค.' },
-    // sale.south1 — ช่วย มิ.ย. 18,000 → ชำระคืน ก.ค. 10,000 → ค้างเหลือ 8,000
+    // sale.south1 — ช่วย มิ.ย. 18,000 → ชำระคืนครบ ก.ค. (ได้คอม ก.ค. ไม่มี loan_help ใหม่ → ยอดค้าง = 0)
     { email: 'sale.south1@beautyup.com',  month: '2026-06', amount:  18000, type: 'loan_help',      note: 'ช่วยยอด มิ.ย. ภาคใต้ 1' },
-    { email: 'sale.south1@beautyup.com',  month: '2026-07', amount: -10000, type: 'repayment',      note: 'ชำระคืนบางส่วน ยอดค้าง มิ.ย.' },
-
-    // ── เดือนนี้ สิงหาคม 2026 — loan_help ───────────────────────────────
-    { email: 'sale.bkk2@beautyup.com',    month: '2026-08', amount:  30000, type: 'loan_help',      note: 'ช่วยยอดสิงหาคม ปริมณฑล' },
-    { email: 'sale.south2@beautyup.com',  month: '2026-08', amount:  15000, type: 'loan_help',      note: 'ช่วยยอดสิงหาคม ภาคใต้ 2' },
+    { email: 'sale.south1@beautyup.com',  month: '2026-07', amount: -18000, type: 'repayment',      note: 'ชำระคืนครบ ยอดค้าง มิ.ย.' },
+    // sale.bkk1 — ช่วย ก.ค. 25,000 → ชำระคืนครบ ส.ค. (ได้คอม ส.ค. ไม่มี loan_help ใหม่ → ยอดค้าง = 0)
+    // (repayment ส.ค. สร้างใน seedAugust2026 เพื่อหลีกเลี่ยง deleteMany conflict)
+    // sale.neast3 — ช่วย ก.ค. 20,000 → ชำระคืนครบ ส.ค. (ไม่มีบัญชีธนาคาร → ยอดค้าง = 0)
+    // (repayment ส.ค. สร้างใน seedAugust2026)
   ];
 
   const mockUserIds = Object.values(userMap);
@@ -479,8 +478,10 @@ async function seedCommissionAdjustments(adminId: string, userMap: Record<string
   for (const adj of mockAdjs) {
     const userId = userMap[adj.email];
     if (!userId) { console.log(`  ไม่พบ user: ${adj.email}`); continue; }
+    const [y, m] = adj.month.split('-').map(Number);
+    const createdAt = new Date(y, m - 1, 15, 10, 0, 0); // วันที่ 15 ของเดือนนั้น
     await prisma.commissionAdjustment.create({
-      data: { userId, month: adj.month, amount: adj.amount, note: adj.note, createdBy: adminId, type: adj.type },
+      data: { userId, month: adj.month, amount: adj.amount, note: adj.note, createdBy: adminId, type: adj.type, createdAt },
     });
     count++;
     const sign = adj.amount > 0 ? '+' : '';
@@ -637,7 +638,196 @@ async function seedJulyCommissionPayments(adminId: string, userMap: Record<strin
   console.log(`  จ่ายแล้ว ${count} คน | ยังค้างจ่าย ${outstanding} คน`);
 }
 
+// ── August 2026 — ครอบคลุมทุกเงื่อนไข commission ──────────────────────────
+async function seedAugust2026(adminId: string, userMap: Record<string, string>) {
+  console.log('\n── August 2026 Commission — ครอบทุกเงื่อนไข ────────────────────');
+
+  const MONTH   = '2026-08';
+  const mockIds = Object.values(userMap);
+  const dateFrom = new Date(2026, 7, 1);
+  const dateTo   = new Date(2026, 7, 31, 23, 59, 59);
+
+  // ── Clear August data ──
+  await prisma.slipSubmission.deleteMany({ where: { userId: { in: mockIds }, createdAt: { gte: dateFrom, lte: dateTo } } });
+  await prisma.commissionPayment.deleteMany({ where: { userId: { in: mockIds }, month: MONTH } });
+  await prisma.commissionAdjustment.deleteMany({ where: { userId: { in: mockIds }, month: MONTH } });
+
+  // ── Upsert commission tiers (ให้ครอบ tier scenarios) ──
+  const tiers = [
+    { min: 30000,  max: 50000,  rate: 3 },
+    { min: 50000,  max: 80000,  rate: 5 },
+    { min: 80000,  max: null,   rate: 7 },
+  ];
+  await prisma.setting.upsert({
+    where:  { key: 'commission_tiers' },
+    update: { value: JSON.stringify(tiers) },
+    create: { key: 'commission_tiers', value: JSON.stringify(tiers) },
+  });
+  console.log('  tiers: 30k=3% / 50k=5% / 80k+=7%');
+
+  function uid(email: string) { return userMap[email] ?? ''; }
+  function slip(email: string, shop: string, amount: number, status: string, ref: string, day: number, debtDeducted = 0) {
+    return { userId: uid(email), shopName: shop, amount, slipUrl: `https://picsum.photos/400/300?random=${ref}`, slipStatus: status, transRef: ref, debtDeducted, createdAt: new Date(2026, 7, day, 9, 0, 0) };
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // 1. sale.bkk1 — ถึงเป้า + จ่ายแล้ว + ชำระคืนยอดค้าง ก.ค.
+  //    slips: 38,000 verified → tier 3% flat → 38,000*3% = 1,140
+  //    repayment -25,000 (ยอดค้าง ก.ค.) → outstandingDebt = 0 ✓
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.bkk1@beautyup.com', 'ร้านสาขาลาดพร้าว',   20000, 'verified', 'AUG01A', 3),
+    slip('sale.bkk1@beautyup.com', 'ร้านสาขาบางนา',      18000, 'verified', 'AUG01B', 8),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: -25000, type: 'repayment', note: 'ชำระคืนครบ ยอดค้าง ก.ค.', createdBy: adminId } });
+  await prisma.commissionPayment.create({ data: { userId: uid('sale.bkk1@beautyup.com'), month: MONTH, amount: 1140, paidBy: adminId, note: 'โอนแล้ว' } });
+  console.log('  [1] sale.bkk1 → ถึงเป้า ฿1,140 จ่ายแล้ว | repayment -25,000 → ค้าง 0');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 2. sale.bkk2 — ถึงเป้า + รอจ่าย (tier 7%) totalAmount=92,000
+  //    slips: 62,000 + loan_help 30,000 → tier 7% flat → 92,000*7% = 6,440
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.bkk2@beautyup.com', 'ร้านแฟชั่นไอส์แลนด์', 30000, 'verified', 'AUG02A', 4),
+    slip('sale.bkk2@beautyup.com', 'ร้านเซ็นทรัลรามา9',  32000, 'verified', 'AUG02B', 10),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.bkk2@beautyup.com'), month: MONTH, amount: 30000, type: 'loan_help', note: 'ช่วยยอดสิงหาคม ปริมณฑล', createdBy: adminId } });
+  console.log('  [2] sale.bkk2 → loan_help 30,000 → tier 7% ยอด 92,000 รอจ่าย ฿6,440');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 3. sale.central — ไม่ถึงเป้า totalAmount=18,000 < 30,000
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.central@beautyup.com', 'ร้านโลตัสสระบุรี',  10000, 'verified', 'AUG03A', 5),
+    slip('sale.central@beautyup.com', 'ร้านแม็กซ์แวลู',    8000, 'verified', 'AUG03B', 12),
+  ]});
+  console.log('  [3] sale.central → ไม่ถึงเป้า ฿18,000');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 4. sale.north1 — มีช่วยยอด → ถึงเป้า tier 3% | ยอดค้างสะสม 3 เดือน
+  //    slips: 22,000 verified + loan_help 10,000 → totalAmount=32,000 → 32,000*3% = 960
+  //    outstandingDebt: พ.ค.+มิ.ย.+ก.ค.+ส.ค. = 50,000+10,000 = 60,000
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.north1@beautyup.com', 'ร้านเชียงใหม่ไนท์บาซาร์', 12000, 'verified', 'AUG04A', 6),
+    slip('sale.north1@beautyup.com', 'ร้านริมปิง',               10000, 'verified', 'AUG04B', 15),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.north1@beautyup.com'), month: MONTH, amount: 10000, type: 'loan_help', note: 'ช่วยยอดพิเศษสาขาเหนือ', createdBy: adminId } });
+  console.log('  [4] sale.north1 → ช่วยยอด +10,000 → tier 3% ยอด 32,000 → ฿960 รอจ่าย | ค้างสะสม 60,000');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 5. sale.north2 — ชำระคืนบางส่วนผ่าน slip deduction
+  //    prior: loan_help ก.ค. 20,000 → deductedจาก slip 8,000 → ค้างเหลือ 12,000
+  //    slips: 45,000, debtDeducted=8,000 → netAmount=37,000 → tier 3% → 37,000*3% = 1,110
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.north2@beautyup.com', 'ร้านบิ๊กซีลำปาง',    25000, 'verified', 'AUG05A', 7,  8000),
+    slip('sale.north2@beautyup.com', 'ร้านโรบินสันลำพูน',  20000, 'verified', 'AUG05B', 14, 0),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.north2@beautyup.com'), month: MONTH, amount: -8000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. ผ่าน slip ส.ค.', createdBy: adminId } });
+  console.log('  [5] sale.north2 → debtDeducted 8,000 → netAmount=37,000 → ฿1,110 | ค้างเหลือ 12,000');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 6. sale.east — มี pending slip (ไม่นับในสูตร) + verified ไม่ถึงเป้า
+  //    verified: 18,000  pending: 20,000 → formula ใช้แค่ 18,000 → ไม่ถึงเป้า
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.east@beautyup.com', 'ร้านเทอร์มินอลพัทยา', 18000, 'verified',        'AUG06A', 8),
+    slip('sale.east@beautyup.com', 'ร้านเซ็นทรัลชลบุรี',  20000, 'pending_approval','AUG06B', 16),
+  ]});
+  console.log('  [6] sale.east → pending 20,000 ไม่นับ → formula=18,000 ไม่ถึงเป้า');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 7. sale.neast1 — มียอดค้างสะสม 3 เดือน + สิงหาคมยังไม่ถึงเป้า
+  //    verified: 25,000  rejected: 15,000 (ไม่นับ) → formula=25,000 < 30,000 → ไม่ได้คอม
+  //    outstandingDebt 45,000 สะสม พ.ค.-ก.ค. ยังไม่ได้ชำระ (ไม่มี loan_help ใหม่เดือนนี้ → rule N/A)
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.neast1@beautyup.com', 'ร้านสุรินทร์พลาซ่า', 25000, 'verified',  'AUG07A', 9),
+    slip('sale.neast1@beautyup.com', 'ร้านปิ่นโตมาร์ท',    15000, 'rejected',  'AUG07B', 13),
+  ]});
+  console.log('  [7] sale.neast1 → ยอดค้าง 45,000 สะสม | ส.ค. 25,000 < threshold ไม่ได้คอม');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 8. sale.neast2 — ช่วยยอด + ยังไม่ถึงเป้า
+  //    verified: 15,000 + loan_help 8,000 → totalAmount=23,000 < 30,000
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.neast2@beautyup.com', 'ร้านเชียงรายบาซาร์', 15000, 'verified', 'AUG08A', 10),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.neast2@beautyup.com'), month: MONTH, amount: 8000, type: 'loan_help', note: 'ช่วยยอดสาขาอีสาน', createdBy: adminId } });
+  console.log('  [8] sale.neast2 → ช่วยยอด 8,000 รวม 23,000 ยังไม่ถึงเป้า');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 9. sale.neast3 — ไม่มีข้อมูลธนาคาร (UI แสดง warning) + ชำระคืนยอดค้าง ก.ค.
+  //    verified: 40,000 → tier 3% flat → 40,000*3% = 1,200 แต่โอนไม่ได้ไม่มีบัญชี
+  //    repayment -20,000 (ยอดค้าง ก.ค.) → outstandingDebt = 0 ✓
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.user.updateMany({ where: { email: 'sale.neast3@beautyup.com' }, data: { bankName: null, bankAccount: null } });
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.neast3@beautyup.com', 'ร้านนครราชสีมาเซ็นทรัล', 40000, 'verified', 'AUG09A', 11),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.neast3@beautyup.com'), month: MONTH, amount: -20000, type: 'repayment', note: 'ชำระคืนครบ ยอดค้าง ก.ค.', createdBy: adminId } });
+  console.log('  [9] sale.neast3 → ไม่มีบัญชี ฿1,200 | repayment -20,000 → ค้าง 0');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 10. sale.south1 — ยอดสูง tier 7% (>80k) + จ่ายแล้ว | outstandingDebt = 0 (ชำระครบใน ก.ค.)
+  //     verified: 95,000 → tier 7% flat → 95,000*7% = 6,650
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.south1@beautyup.com', 'ร้านหาดใหญ่เซ็นทรัล', 50000, 'verified', 'AUG10A', 3),
+    slip('sale.south1@beautyup.com', 'ร้านภูเก็ตโอเชี่ยน',  30000, 'verified', 'AUG10B', 9),
+    slip('sale.south1@beautyup.com', 'ร้านสุราษฎร์ธานีพลาซ่า', 15000, 'verified', 'AUG10C', 14),
+  ]});
+  await prisma.commissionPayment.create({ data: { userId: uid('sale.south1@beautyup.com'), month: MONTH, amount: 6650, paidBy: adminId, note: 'โอนแล้ว tier สูงสุด' } });
+  console.log('  [10] sale.south1 → tier 7% ยอด 95,000 → จ่ายแล้ว ฿6,650 | ค้าง 0');
+
+  // ────────────────────────────────────────────────────────────────────
+  // 11. sale.south2 — tier 5% + มี pending รออนุมัติ + loan_help ส.ค.
+  //     verified: 58,000 + loan_help 15,000 → totalAmount=73,000 → tier 5% → 73,000*5% = 3,650
+  //     pending: 12,000 ไม่นับในสูตร
+  // ────────────────────────────────────────────────────────────────────
+  await prisma.slipSubmission.createMany({ data: [
+    slip('sale.south2@beautyup.com', 'ร้านนครศรีธรรมราช',  35000, 'verified',         'AUG11A', 5),
+    slip('sale.south2@beautyup.com', 'ร้านสงขลาพลาซ่า',    23000, 'verified',         'AUG11B', 12),
+    slip('sale.south2@beautyup.com', 'ร้านตรังเซ็นทรัล',   12000, 'pending_approval', 'AUG11C', 17),
+  ]});
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.south2@beautyup.com'), month: MONTH, amount: 15000, type: 'loan_help', note: 'ช่วยยอดสิงหาคม ภาคใต้ 2', createdBy: adminId } });
+  console.log('  [11] sale.south2 → loan_help 15,000 → tier 5% ยอด 73,000 + pending 12,000 → ฿3,650 รอจ่าย');
+
+  console.log('\n  ✓ August 2026 seed เสร็จ — ครอบ 11 scenarios | flat tier, outstanding debt consistent');
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
+async function seedTodayPendingSlips(userMap: Record<string, string>) {
+  console.log('\n── Today Pending Approvals (17 ส.ค. 2569) ────────────────────');
+
+  const today = new Date(2026, 7, 17, 10, 0, 0); // 2026-08-17
+
+  const pending = [
+    { email: 'sale.bkk1@beautyup.com',    shopName: 'ร้านสาขาลาดพร้าว',  amount: 18500, transRef: 'TXN2608001' },
+    { email: 'sale.north1@beautyup.com',  shopName: 'ร้านเชียงใหม่เซ็นทรัล', amount: 32000, transRef: 'TXN2608002' },
+    { email: 'sale.central@beautyup.com', shopName: 'ร้านโลตัสสระบุรี',   amount: 25000, transRef: 'TXN2608003' },
+  ];
+
+  for (const p of pending) {
+    const userId = userMap[p.email];
+    if (!userId) continue;
+    await prisma.slipSubmission.create({
+      data: {
+        userId,
+        shopName:   p.shopName,
+        amount:     p.amount,
+        slipUrl:    `https://picsum.photos/400/300?random=${p.transRef}`,
+        slipStatus: 'pending_approval',
+        transRef:   p.transRef,
+        createdAt:  new Date(today.getTime() + Math.floor(Math.random() * 3600000)),
+      },
+    });
+    console.log(`  pending: ${p.email.split('@')[0].padEnd(20)} ฿${p.amount.toLocaleString('th-TH')} — ${p.shopName}`);
+  }
+}
+
 async function main() {
   console.log('Seeding...\n');
 
@@ -712,6 +902,12 @@ async function main() {
 
   // 9. July commission payments — 4 paid, 7 outstanding (monthsAgo=1)
   await seedJulyCommissionPayments(admin.id, userMap);
+
+  // 10. August 2026 — ครอบทุกเงื่อนไข commission (11 scenarios)
+  await seedAugust2026(admin.id, userMap);
+
+  // 11. Today pending slips — 3 รายการรออนุมัติวันนี้
+  await seedTodayPendingSlips(userMap);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

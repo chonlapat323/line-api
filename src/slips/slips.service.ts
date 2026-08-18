@@ -119,6 +119,7 @@ export class SlipsService {
   async findAll(params: {
     userId: string;
     role: string;
+    roleId?: string;
     filterUserId?: string;
     status?: string;
     search?: string;
@@ -127,10 +128,20 @@ export class SlipsService {
     page?: number;
     limit?: number;
   }) {
-    const { userId, role, page = 1, limit = 20 } = params;
+    const { userId, role, roleId, page = 1, limit = 20 } = params;
     const skip = (page - 1) * limit;
 
-    const where: any = role !== 'admin' ? { userId } : {};
+    let canViewAll = role === 'admin';
+    if (!canViewAll && roleId) {
+      const roleRecord = await this.prisma.role.findUnique({ where: { id: roleId } });
+      if (roleRecord?.isActive) {
+        const perms = roleRecord.permissions as { menu: string; canView: boolean; canEdit: boolean }[];
+        const approvalsPerm = perms.find((p) => p.menu === 'approvals');
+        canViewAll = approvalsPerm?.canView === true;
+      }
+    }
+
+    const where: any = canViewAll ? {} : { userId };
     if (params.filterUserId) where.userId = params.filterUserId;
     if (params.status) where.slipStatus = params.status;
     if (params.search) {

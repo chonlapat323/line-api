@@ -427,7 +427,7 @@ export class VisitsService {
       const monthsAgo = (cy - y) * 12 + (cm - m);
 
       for (const row of summary) {
-        if (row.reachedThreshold && !paidSet.has(`${row.userId}::${month}`)) {
+        if (row.reachedThreshold && row.commission > 0 && !paidSet.has(`${row.userId}::${month}`)) {
           results.push({ ...row, month, monthsAgo });
         }
       }

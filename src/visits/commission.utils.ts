@@ -33,17 +33,17 @@ export function calculateCommission({ totalAmount, rate, threshold, tiers }: Com
   }
 
   if (tiers && tiers.length > 0) {
-    let totalCommission = 0;
-    const breakdown: TierBreakdown[] = [];
+    // flat tier: หา tier สูงสุดที่ totalAmount >= tier.min แล้วคิด rate นั้นกับยอดทั้งหมด
+    let activeTier = tiers[0];
     for (const tier of tiers) {
-      const tierMax = tier.max ?? Infinity;
-      if (totalAmount <= tier.min) break;
-      const amountInTier = Math.min(totalAmount, tierMax) - tier.min;
-      const commissionInTier = Math.round(amountInTier * tier.rate) / 100;
-      totalCommission += commissionInTier;
-      breakdown.push({ min: tier.min, max: tier.max, rate: tier.rate, amount: amountInTier, commission: commissionInTier });
+      if (totalAmount >= tier.min) activeTier = tier;
     }
-    return { reachedThreshold: true, commission: totalCommission, remaining: 0, breakdown };
+    const commission = Math.round(totalAmount * activeTier.rate) / 100;
+    const breakdown: TierBreakdown[] = [{
+      min: activeTier.min, max: activeTier.max, rate: activeTier.rate,
+      amount: totalAmount, commission,
+    }];
+    return { reachedThreshold: true, commission, remaining: 0, breakdown };
   }
 
   const commission = Math.round(totalAmount * rate) / 100;
