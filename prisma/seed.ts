@@ -149,8 +149,8 @@ function juneDate(): Date {
 function gpsOff(): number { return (Math.random() - 0.5) * 0.04; }
 
 const MOCKUP_USERS = [
-  { email: 'sale.bkk1@beautyup.com',    fullName: 'สมหญิง ใจดี',    bankName: 'กสิกรไทย',    bankAccount: '012-3-45678-9' },
-  { email: 'sale.bkk2@beautyup.com',    fullName: 'สมชาย วงษ์ดี',   bankName: 'กรุงเทพ',     bankAccount: '123-4-56789-0' },
+  { email: 'sale.bkk1@beautyup.com',    fullName: 'พรทิพย์ มีสุข',   bankName: 'กสิกรไทย',    bankAccount: '012-3-45678-9' },
+  { email: 'sale.bkk2@beautyup.com',    fullName: 'ธนภัทร วงษ์ดี',   bankName: 'กรุงเทพ',     bankAccount: '123-4-56789-0' },
   { email: 'sale.central@beautyup.com', fullName: 'วิมล รักดี',      bankName: 'ไทยพาณิชย์',  bankAccount: '234-5-67890-1' },
   { email: 'sale.north1@beautyup.com',  fullName: 'สมศรี แก้วใจ',   bankName: 'กรุงไทย',     bankAccount: '345-6-78901-2' },
   { email: 'sale.north2@beautyup.com',  fullName: 'ธนกร ทองดี',      bankName: 'กสิกรไทย',    bankAccount: '456-7-89012-3' },
@@ -782,16 +782,16 @@ async function seedAugust2026(adminId: string, userMap: Record<string, string>) 
   console.log('  [4] sale.north1 → ช่วยยอด +10,000 → tier 3% ยอด 32,000 → ฿960 รอจ่าย | ค้างสะสม 60,000');
 
   // ────────────────────────────────────────────────────────────────────
-  // 5. sale.north2 — ชำระคืนบางส่วนผ่าน slip deduction
-  //    prior: loan_help ก.ค. 20,000 → deductedจาก slip 8,000 → ค้างเหลือ 12,000
-  //    slips: 45,000, debtDeducted=8,000 → netAmount=37,000 → tier 3% → 37,000*3% = 1,110
+  // 5. sale.north2 — หักหนี้เต็มจำนวนผ่าน slip
+  //    prior: loan_help ก.ค. 20,000 → slip แรก 25,000 ≥ หนี้ → หักเต็ม 20,000
+  //    slips: 45,000, debtDeducted=20,000 → netAmount=25,000 → ต่ำกว่า threshold → ไม่ได้ค่าคอม
   // ────────────────────────────────────────────────────────────────────
   await prisma.slipSubmission.createMany({ data: [
-    slip('sale.north2@beautyup.com', 'ร้านบิ๊กซีลำปาง',    25000, 'verified', 'AUG05A', 7,  8000),
+    slip('sale.north2@beautyup.com', 'ร้านบิ๊กซีลำปาง',    25000, 'verified', 'AUG05A', 7,  20000),
     slip('sale.north2@beautyup.com', 'ร้านโรบินสันลำพูน',  20000, 'verified', 'AUG05B', 14, 0),
   ]});
-  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.north2@beautyup.com'), month: MONTH, amount: -8000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. ผ่าน slip ส.ค.', createdBy: adminId } });
-  console.log('  [5] sale.north2 → debtDeducted 8,000 → netAmount=37,000 → ฿1,110 | ค้างเหลือ 12,000');
+  await prisma.commissionAdjustment.create({ data: { userId: uid('sale.north2@beautyup.com'), month: MONTH, amount: -20000, type: 'repayment', note: 'หักคืนยอดค้าง ก.ค. ผ่าน slip ส.ค.', createdBy: adminId } });
+  console.log('  [5] sale.north2 → debtDeducted 20,000 (เต็ม) → netAmount=25,000 → ไม่ถึงเป้า | ค้างเหลือ 0');
 
   // ────────────────────────────────────────────────────────────────────
   // 6. sale.east — มี pending slip (ไม่นับในสูตร) + verified ไม่ถึงเป้า
