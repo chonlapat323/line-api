@@ -122,6 +122,7 @@ model SlipSubmission {
   debtDeducted  Float     @default(0) // ยอดที่หักคืนหนี้จาก slip นี้
   province    String?
   district    String?
+  isProxy     Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
   user     User  @relation("SlipSubmissions", fields: [userId], references: [id])

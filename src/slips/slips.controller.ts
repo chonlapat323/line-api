@@ -20,6 +20,7 @@ export class SlipsController {
       transRef?: string;
       province?: string;
       district?: string;
+      isProxy?: boolean;
     },
     @Request() req,
   ) {
@@ -33,6 +34,7 @@ export class SlipsController {
       transRef: body.transRef || '',
       province: body.province || '',
       district: body.district || '',
+      isProxy: body.isProxy ?? false,
     });
   }
 

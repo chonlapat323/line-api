@@ -64,6 +64,7 @@ export class SlipsService {
     transRef?: string;
     province?: string;
     district?: string;
+    isProxy?: boolean;
   }) {
     const submission = await this.prisma.slipSubmission.create({
       data: {
@@ -76,6 +77,7 @@ export class SlipsService {
         transRef: params.transRef ?? null,
         province: params.province ?? null,
         district: params.district ?? null,
+        isProxy: params.isProxy ?? false,
       },
     });
 
