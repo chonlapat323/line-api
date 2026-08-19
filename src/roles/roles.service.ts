@@ -5,6 +5,7 @@ export type MenuPermission = {
   menu: string;
   label: string;
   canView: boolean;
+  canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
 };
@@ -28,6 +29,7 @@ export function buildFullPermissions(partial: Partial<MenuPermission>[] = []): M
       menu: m.menu,
       label: m.label,
       canView: found?.canView ?? false,
+      canCreate: found?.canCreate ?? false,
       canEdit: found?.canEdit ?? false,
       canDelete: found?.canDelete ?? false,
     };
@@ -43,11 +45,12 @@ export class RolesService implements OnModuleInit {
   }
 
   private async seedDefaults() {
-    const perm = (menus: string[], edit: string[] = [], del: string[] = []) =>
+    const perm = (menus: string[], create: string[] = [], edit: string[] = [], del: string[] = []) =>
       MENUS.map((m) => ({
         menu: m.menu,
         label: m.label,
         canView: menus.includes(m.menu),
+        canCreate: create.includes(m.menu),
         canEdit: edit.includes(m.menu),
         canDelete: del.includes(m.menu),
       }));
@@ -56,21 +59,21 @@ export class RolesService implements OnModuleInit {
       {
         name: 'admin',
         label: 'แอดมิน',
-        permissions: MENUS.map((m) => ({ menu: m.menu, label: m.label, canView: true, canEdit: true, canDelete: true })),
+        permissions: MENUS.map((m) => ({ menu: m.menu, label: m.label, canView: true, canCreate: true, canEdit: true, canDelete: true })),
         isSystem: true,
         isActive: true,
       },
       {
         name: 'user',
         label: 'เซล์',
-        permissions: perm(['dashboard', 'visits', 'commissions'], ['visits']),
+        permissions: perm(['dashboard', 'visits', 'commissions'], ['visits'], ['visits']),
         isSystem: false,
         isActive: true,
       },
       {
         name: 'manager',
         label: 'ผู้จัดการเซล์',
-        permissions: perm(['dashboard', 'sales', 'visits', 'commissions'], ['visits']),
+        permissions: perm(['dashboard', 'sales', 'visits', 'commissions'], ['visits'], ['visits']),
         isSystem: false,
         isActive: true,
       },
@@ -79,6 +82,7 @@ export class RolesService implements OnModuleInit {
         label: 'บัญชี',
         permissions: perm(
           ['dashboard', 'sales', 'visits', 'approvals', 'commissions'],
+          ['approvals', 'commissions'],
           ['approvals', 'commissions'],
         ),
         isSystem: false,
