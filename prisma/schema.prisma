@@ -120,6 +120,8 @@ model SlipSubmission {
   approvedBy    String?
   approvedAt    DateTime?
   debtDeducted  Float     @default(0) // ยอดที่หักคืนหนี้จาก slip นี้
+  province    String?
+  district    String?
   createdAt   DateTime  @default(now())
 
   user     User  @relation("SlipSubmissions", fields: [userId], references: [id])

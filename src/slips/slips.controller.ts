@@ -18,6 +18,8 @@ export class SlipsController {
       slipUrl: string;
       slipStatus: string;
       transRef?: string;
+      province?: string;
+      district?: string;
     },
     @Request() req,
   ) {
@@ -29,6 +31,8 @@ export class SlipsController {
       slipUrl: body.slipUrl,
       slipStatus: body.slipStatus,
       transRef: body.transRef || '',
+      province: body.province || '',
+      district: body.district || '',
     });
   }
 
