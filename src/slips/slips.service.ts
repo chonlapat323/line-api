@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nest
 import { PrismaService } from '../prisma/prisma.service';
 import { LineService } from '../line/line.service';
 import { CommissionAdjustmentsService } from '../commission-adjustments/commission-adjustments.service';
+import { SettingsService } from '../settings/settings.service';
 
 function getCurrentMonth(): string {
   const now = new Date();
@@ -16,6 +17,7 @@ export class SlipsService {
     private prisma: PrismaService,
     private lineService: LineService,
     private commissionAdjustments: CommissionAdjustmentsService,
+    private settings: SettingsService,
   ) {}
 
   async applyDebtDeduction(slipId: string, userId: string, slipAmount: number, adminId: string): Promise<number> {
@@ -205,5 +207,75 @@ export class SlipsService {
     ]);
 
     return updated;
+  }
+
+  async getProxyCommission(params: { month: string }) {
+    const [year, mon] = params.month.split('-').map(Number);
+    const from = new Date(year, mon - 1, 1);
+    const to = new Date(year, mon, 1);
+
+    const rateRaw = await this.settings.get('proxy_commission_rate');
+    const proxyRate = parseFloat(rateRaw || '2');
+
+    const slips = await this.prisma.slipSubmission.findMany({
+      where: {
+        isProxy: true,
+        slipStatus: { in: ['verified', 'approved'] },
+        createdAt: { gte: from, lt: to },
+      },
+      include: { user: { select: { id: true, fullName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const byUser = new Map<string, { userId: string; fullName: string; email: string; slips: typeof slips }>();
+    for (const s of slips) {
+      const uid = s.userId;
+      if (!byUser.has(uid)) {
+        byUser.set(uid, { userId: uid, fullName: s.user.fullName, email: s.user.email, slips: [] });
+      }
+      byUser.get(uid)!.slips.push(s);
+    }
+
+    const summary = Array.from(byUser.values()).map((u) => {
+      const totalAmount = u.slips.reduce((sum, s) => sum + (s.amount ?? 0), 0);
+      return {
+        userId: u.userId,
+        fullName: u.fullName,
+        email: u.email,
+        slipCount: u.slips.length,
+        totalAmount,
+        proxyRate,
+        proxyCommission: Math.round(totalAmount * proxyRate) / 100,
+        slips: u.slips,
+      };
+    });
+
+    return { summary, proxyRate, month: params.month };
+  }
+
+  async toggleProxy(params: { id: string; isProxy: boolean; requesterId: string; requesterRole: string }) {
+    const slip = await this.prisma.slipSubmission.findUnique({ where: { id: params.id } });
+    if (!slip) throw new NotFoundException('ไม่พบข้อมูล');
+
+    if (params.requesterRole !== 'admin') {
+      const roleRecord = await this.prisma.role.findFirst({
+        where: { users: { some: { id: params.requesterId } } },
+      });
+      const perms = (roleRecord?.permissions ?? []) as any[];
+      const canEdit = perms.find((p) => p.menu === 'approvals')?.canEdit;
+      if (!canEdit) throw new ForbiddenException('ไม่มีสิทธิ์');
+    }
+
+    // ล็อกถ้าโอนคอมแล้วในเดือนนั้น
+    const month = `${slip.createdAt.getFullYear()}-${String(slip.createdAt.getMonth() + 1).padStart(2, '0')}`;
+    const paid = await this.prisma.commissionPayment.findUnique({
+      where: { userId_month: { userId: slip.userId, month } },
+    });
+    if (paid) throw new ForbiddenException('โอนค่าคอมมิชชันในเดือนนี้แล้ว ไม่สามารถแก้ไขได้');
+
+    return this.prisma.slipSubmission.update({
+      where: { id: params.id },
+      data: { isProxy: params.isProxy },
+    });
   }
 }

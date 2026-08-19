@@ -54,6 +54,30 @@ export class SlipsController {
     });
   }
 
+  @Get('proxy-commission')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'commissions', action: 'canView' })
+  getProxyCommission(@Query() q: { month?: string }) {
+    const month = q.month || new Date().toISOString().slice(0, 7);
+    return this.slipsService.getProxyCommission({ month });
+  }
+
+  @Patch(':id/proxy')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canEdit' })
+  toggleProxy(
+    @Param('id') id: string,
+    @Body() body: { isProxy: boolean },
+    @Request() req,
+  ) {
+    return this.slipsService.toggleProxy({
+      id,
+      isProxy: body.isProxy,
+      requesterId: req.user.id,
+      requesterRole: req.user.role,
+    });
+  }
+
   @Patch(':id/approve')
   @UseGuards(RolesGuard)
   @Roles({ menu: 'approvals', action: 'canEdit' })
