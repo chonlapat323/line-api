@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -65,6 +65,17 @@ export class UsersService {
       data: { email: dto.email, passwordHash: hash, fullName: dto.fullName, role: dto.role || 'user' },
     });
     return { id: user.id, email: user.email, fullName: user.fullName, role: user.role };
+  }
+
+  async changePassword(id: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new UnauthorizedException();
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!match) throw new BadRequestException('รหัสผ่านเดิมไม่ถูกต้อง');
+    if (newPassword.length < 6) throw new BadRequestException('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id }, data: { passwordHash: hash } });
+    return { success: true };
   }
 
   async remove(id: string) {

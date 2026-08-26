@@ -27,6 +27,11 @@ export class UsersController {
     return this.usersService.updateMe(req.user.id, body);
   }
 
+  @Patch('me/password')
+  changePassword(@Request() req, @Body() body: { currentPassword: string; newPassword: string }) {
+    return this.usersService.changePassword(req.user.id, body.currentPassword, body.newPassword);
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles({ menu: 'users', action: 'canEdit' })
