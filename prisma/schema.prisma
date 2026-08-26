@@ -149,6 +149,7 @@ model VisitRecord {
   shopName     String
   province     String
   district     String?
+  shopNote     String?
   latitude     Float
   longitude    Float
   tripType     String?

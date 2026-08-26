@@ -21,6 +21,7 @@ export class VisitsService {
     shopName: string;
     province: string;
     district: string;
+    shopNote: string;
     latitude: number;
     longitude: number;
     tripType: string;
@@ -43,6 +44,7 @@ export class VisitsService {
         shopName: params.shopName,
         province: params.province,
         district: params.district || null,
+        shopNote: params.shopNote || null,
         latitude: params.latitude,
         longitude: params.longitude,
         tripType: params.tripType || null,

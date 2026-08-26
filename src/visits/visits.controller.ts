@@ -43,6 +43,7 @@ export class VisitsController {
       shopName: body.shopName,
       province: body.province,
       district: body.district || '',
+      shopNote: body.shopNote || '',
       latitude: parseFloat(body.latitude),
       longitude: parseFloat(body.longitude),
       tripType: body.tripType || '',
