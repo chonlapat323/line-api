@@ -44,6 +44,7 @@ export class VisitsController {
       province: body.province,
       district: body.district || '',
       shopNote: body.shopNote || '',
+      shopPhone: body.shopPhone || '',
       latitude: parseFloat(body.latitude),
       longitude: parseFloat(body.longitude),
       tripType: body.tripType || '',
@@ -148,6 +149,12 @@ export class VisitsController {
   @UseGuards(JwtAuthGuard)
   getCommissionBreakdown(@Query('userId') userId: string, @Query('month') month: string) {
     return this.visitsService.getCommissionBreakdown({ userId, month });
+  }
+
+  @Get('last-by-shop')
+  @UseGuards(JwtAuthGuard)
+  getLastByShop(@Request() req, @Query('shopName') shopName: string) {
+    return this.visitsService.lastByShop(req.user.id, shopName);
   }
 
   @Get('province-stats')

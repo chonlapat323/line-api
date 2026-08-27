@@ -46,6 +46,7 @@ export class AuthService {
         roleId: user.roleId ?? null,
         roleLabel: user.roleRef?.label ?? (user.role === 'admin' ? 'แอดมิน' : 'ผู้ใช้ทั่วไป'),
         permissions,
+        mustChangePassword: (user as any).mustChangePassword ?? false,
       },
     };
   }

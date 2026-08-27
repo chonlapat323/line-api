@@ -22,6 +22,7 @@ export class VisitsService {
     province: string;
     district: string;
     shopNote: string;
+    shopPhone: string;
     latitude: number;
     longitude: number;
     tripType: string;
@@ -45,6 +46,7 @@ export class VisitsService {
         province: params.province,
         district: params.district || null,
         shopNote: params.shopNote || null,
+        shopPhone: params.shopPhone || null,
         latitude: params.latitude,
         longitude: params.longitude,
         tripType: params.tripType || null,
@@ -628,5 +630,15 @@ export class VisitsService {
         ...(data.details !== undefined ? { details: data.details } : {}),
       },
     });
+  }
+
+  async lastByShop(userId: string, shopName: string) {
+    if (!shopName) return null;
+    const record = await this.prisma.visitRecord.findFirst({
+      where: { userId, shopName },
+      orderBy: { createdAt: 'desc' },
+      select: { province: true, district: true, shopNote: true, shopPhone: true },
+    } as any);
+    return record ?? null;
   }
 }

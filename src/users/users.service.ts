@@ -22,11 +22,11 @@ export class UsersService {
       where: { id },
       select: {
         id: true, email: true, fullName: true, role: true, roleId: true,
-        bankName: true, bankAccount: true,
+        bankName: true, bankAccount: true, mustChangePassword: true,
         roleRef: { select: { label: true } },
         lineGroups: { where: { isActive: true }, select: { id: true }, take: 1 },
-      },
-    });
+      } as any,
+    } as any);
     if (!user) return null;
     const { lineGroups, ...rest } = user;
     return { ...rest, lineConnected: lineGroups.length > 0 };
@@ -62,7 +62,7 @@ export class UsersService {
 
     const hash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
-      data: { email: dto.email, passwordHash: hash, fullName: dto.fullName, role: dto.role || 'user' },
+      data: { email: dto.email, passwordHash: hash, fullName: dto.fullName, role: dto.role || 'user', mustChangePassword: true } as any,
     });
     return { id: user.id, email: user.email, fullName: user.fullName, role: user.role };
   }
@@ -74,7 +74,21 @@ export class UsersService {
     if (!match) throw new BadRequestException('รหัสผ่านเดิมไม่ถูกต้อง');
     if (newPassword.length < 6) throw new BadRequestException('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
     const hash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.user.update({ where: { id }, data: { passwordHash: hash } });
+    await this.prisma.user.update({ where: { id }, data: { passwordHash: hash, mustChangePassword: false } as any });
+    return { success: true };
+  }
+
+  async forceChangePassword(id: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new UnauthorizedException();
+    if (newPassword.length < 6) throw new BadRequestException('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id }, data: { passwordHash: hash, mustChangePassword: false } as any });
+    return { success: true };
+  }
+
+  async resetMustChangePassword(id: string) {
+    await this.prisma.user.update({ where: { id }, data: { mustChangePassword: true } as any });
     return { success: true };
   }
 

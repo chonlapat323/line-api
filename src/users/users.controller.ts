@@ -32,6 +32,18 @@ export class UsersController {
     return this.usersService.changePassword(req.user.id, body.currentPassword, body.newPassword);
   }
 
+  @Patch('me/force-change-password')
+  forceChangePassword(@Request() req, @Body() body: { newPassword: string }) {
+    return this.usersService.forceChangePassword(req.user.id, body.newPassword);
+  }
+
+  @Post(':id/reset-must-change-password')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'users', action: 'canEdit' })
+  resetMustChangePassword(@Param('id') id: string) {
+    return this.usersService.resetMustChangePassword(id);
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles({ menu: 'users', action: 'canEdit' })
