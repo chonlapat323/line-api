@@ -93,7 +93,7 @@ export class RolesService implements OnModuleInit {
     for (const r of roles) {
       await this.prisma.role.upsert({
         where: { name: r.name },
-        update: { label: r.label, permissions: r.permissions, isActive: r.isActive },
+        update: { label: r.label, isActive: r.isActive },
         create: r,
       });
     }
