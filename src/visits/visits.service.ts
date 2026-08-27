@@ -39,7 +39,7 @@ export class VisitsService {
     const appUrl = process.env.APP_URL || 'http://localhost:3002';
     const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
 
-    const record = await this.prisma.visitRecord.create({
+    const record = await (this.prisma.visitRecord.create as any)({
       data: {
         userId: params.userId,
         shopName: params.shopName,

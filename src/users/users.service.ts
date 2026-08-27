@@ -28,7 +28,7 @@ export class UsersService {
       } as any,
     } as any);
     if (!user) return null;
-    const { lineGroups, ...rest } = user;
+    const { lineGroups, ...rest } = user as any;
     return { ...rest, lineConnected: lineGroups.length > 0 };
   }
 
