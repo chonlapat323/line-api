@@ -340,16 +340,18 @@ export class VisitsService {
     const adjCarryoverMap = new Map<string, number>();
     for (const a of adjCarryoverRows) adjCarryoverMap.set(a.userId, a._sum.amount ?? 0);
 
-    const userMap = new Map<string, { user: any; count: number; slipAmount: number; totalDeducted: number; pendingCount: number }>();
+    const userMap = new Map<string, { user: any; count: number; slipAmount: number; totalDeducted: number; pendingCount: number; proxySlipAmount: number }>();
     for (const slip of slips) {
       if (!userMap.has(slip.userId)) {
-        userMap.set(slip.userId, { user: slip.user, count: 0, slipAmount: 0, totalDeducted: 0, pendingCount: 0 });
+        userMap.set(slip.userId, { user: slip.user, count: 0, slipAmount: 0, totalDeducted: 0, pendingCount: 0, proxySlipAmount: 0 });
       }
       const entry = userMap.get(slip.userId)!;
       if (slip.slipStatus === 'pending_approval') {
         entry.pendingCount++;
-      } else if (!slip.isProxy) {
-        // ไม่นับ proxy slip เข้าค่าคอมปกติ — คำนวณแยกใน getProxyCommission
+      } else if (slip.isProxy) {
+        // proxy slip: นับรวมยอดเพื่อเช็ค threshold แต่ไม่คิดค่าคอมปกติ
+        entry.proxySlipAmount += (slip.amount ?? 0);
+      } else {
         entry.count++;
         entry.slipAmount += (slip.amount ?? 0);
         entry.totalDeducted += (slip.debtDeducted ?? 0);
@@ -368,27 +370,41 @@ export class VisitsService {
         select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true },
       });
       for (const u of missingUsers) {
-        userMap.set(u.id, { user: u, count: 0, slipAmount: 0, totalDeducted: 0, pendingCount: 0 });
+        userMap.set(u.id, { user: u, count: 0, slipAmount: 0, totalDeducted: 0, pendingCount: 0, proxySlipAmount: 0 });
       }
     }
 
     const summary = Array.from(userMap.entries())
-      .map(([uid, { user, count, slipAmount, totalDeducted, pendingCount }]) => {
+      .map(([uid, { user, count, slipAmount, totalDeducted, pendingCount, proxySlipAmount }]) => {
         const adjustThisMonth = adjThisMonthMap.get(uid) ?? 0;
         const adjustCarryover = adjCarryoverMap.get(uid) ?? 0;
-        // commission คำนวณจาก net slips (gross - หักคืนค้าง) + ช่วยยอดยกมา + ช่วยยอดเดือนนี้
-        const totalAmount = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
-        const { reachedThreshold, commission } = calculateCommission({ totalAmount, rate, threshold, tiers });
+        const regularBase = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
+        // threshold เช็คจากยอดรวมทั้ง regular + proxy
+        const totalForThreshold = regularBase + proxySlipAmount;
+        const reachedThreshold = threshold === 0 || totalForThreshold >= threshold;
+        // commission คิดจาก regular base เท่านั้น
+        let commission = 0;
+        if (reachedThreshold && regularBase > 0) {
+          if (tiers && tiers.length > 0) {
+            let activeTier = tiers[0];
+            for (const tier of tiers) {
+              if (regularBase >= tier.min) activeTier = tier;
+            }
+            commission = Math.round(regularBase * activeTier.rate) / 100;
+          } else {
+            commission = Math.round(regularBase * rate) / 100;
+          }
+        }
         const outstandingDebt = debtMap.get(uid) ?? 0;
         return {
           userId: uid,
           user: { fullName: user.fullName, email: user.email, bankName: user.bankName, bankAccount: user.bankAccount },
           visitCount: count,
-          slipAmount,          // ยอดสลิปรวม (gross)
-          totalDeducted,       // ยอดที่หักคืนจากหนี้ผ่าน slip เดือนนี้
-          adjustThisMonth,     // ยอดช่วยยอดเดือนนี้ (loan_help)
-          adjustCarryover,     // ยอดยกมา (loan_help เดือนก่อนๆ สุทธิ)
-          totalAmount,         // ยอดคำนวณ = gross + ยกมา + ช่วยเดือนนี้
+          slipAmount,
+          totalDeducted,
+          adjustThisMonth,
+          adjustCarryover,
+          totalAmount: regularBase,
           outstandingDebt,
           reachedThreshold,
           commission,
