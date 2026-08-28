@@ -282,6 +282,7 @@ export class VisitsService {
           amount: true,
           debtDeducted: true,
           slipStatus: true,
+          isProxy: true,
           user: { select: { id: true, fullName: true, email: true, bankName: true, bankAccount: true } },
         },
       }),
@@ -347,10 +348,11 @@ export class VisitsService {
       const entry = userMap.get(slip.userId)!;
       if (slip.slipStatus === 'pending_approval') {
         entry.pendingCount++;
-      } else {
+      } else if (!slip.isProxy) {
+        // ไม่นับ proxy slip เข้าค่าคอมปกติ — คำนวณแยกใน getProxyCommission
         entry.count++;
-        entry.slipAmount += (slip.amount ?? 0);           // gross — commission คำนวณจากยอดขายจริง
-        entry.totalDeducted += (slip.debtDeducted ?? 0);  // หักคืนหนี้แยกต่างหาก
+        entry.slipAmount += (slip.amount ?? 0);
+        entry.totalDeducted += (slip.debtDeducted ?? 0);
       }
     }
 
