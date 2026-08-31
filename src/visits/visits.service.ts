@@ -470,10 +470,10 @@ export class VisitsService {
           slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
           createdAt: { gte: dateFrom, lte: dateTo },
         },
-        select: { id: true, shopName: true, amount: true, debtDeducted: true, slipStatus: true, createdAt: true },
+        select: { id: true, shopName: true, amount: true, debtDeducted: true, slipStatus: true, isProxy: true, createdAt: true },
       }),
       this.prisma.setting.findMany({
-        where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers'] } },
+        where: { key: { in: ['commission_rate', 'commission_threshold', 'commission_tiers', 'proxy_commission_rate'] } },
       }),
       // ยอดเติมเดือนนี้ loan_help เท่านั้น (บวกเข้า commission formula)
       this.prisma.commissionAdjustment.aggregate({
@@ -501,37 +501,49 @@ export class VisitsService {
     const rate = parseFloat(settingMap['commission_rate'] || '0');
     const threshold = parseFloat(settingMap['commission_threshold'] || '0');
     const tiers = settingMap['commission_tiers'] ? JSON.parse(settingMap['commission_tiers']) : [];
+    const proxyRate = parseFloat(settingMap['proxy_commission_rate'] || '0');
 
     const confirmedSlips = slips.filter((s) => s.slipStatus !== 'pending_approval');
     const pendingSlips   = slips.filter((s) => s.slipStatus === 'pending_approval');
 
-    // ยอดสลิปรวม (gross — commission คำนวณจากยอดขายจริง)
-    const slipAmount    = confirmedSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
-    const totalDeducted = confirmedSlips.reduce((s, v) => s + (v.debtDeducted ?? 0), 0);
-    const pendingAmount = pendingSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
+    const regularSlips = confirmedSlips.filter((s) => !s.isProxy);
+    const proxySlips   = confirmedSlips.filter((s) => s.isProxy);
+
+    // ยอดสลิปปกติ
+    const slipAmount       = regularSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
+    const totalDeducted    = regularSlips.reduce((s, v) => s + (v.debtDeducted ?? 0), 0);
+    // ยอดสลิปเก็บแทน
+    const proxySlipAmount  = proxySlips.reduce((s, v) => s + (v.amount ?? 0), 0);
+    const pendingAmount    = pendingSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
 
     const adjustThisMonth = adjThisMonth._sum.amount ?? 0;
     const adjustCarryover = adjCarryover._sum.amount ?? 0;
 
-    // ยอดคำนวณ = net slips (gross - หักคืนค้าง) + ช่วยยอดยกมา + ช่วยยอดเดือนนี้
+    // ยอดคำนวณค่าคอมปกติ (ไม่รวม proxy)
     const totalAmount = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
 
-    // ยอดค้างจากเดือนก่อน = positive เดือนก่อน + negative ทั้งหมด
+    // ยอดค้างจากเดือนก่อน
     const outstandingDebt = Math.max(0, (prevPosResult._sum.amount ?? 0) + (allNegResult._sum.amount ?? 0));
 
     const { reachedThreshold, commission, remaining, breakdown } = calculateCommission({ totalAmount, rate, threshold, tiers });
 
+    // ค่าคอมเก็บแทน (คำนวณแยก)
+    const proxyCommission = proxyRate > 0 ? Math.round(proxySlipAmount * proxyRate) / 100 : 0;
+
     return {
       month, visitCount: slips.length,
-      slipAmount,           // ยอดสลิปรวม (gross)
-      totalDeducted,        // ยอดที่หักคืนหนี้ผ่าน slip
-      adjustThisMonth,      // ยอดช่วยยอดเดือนนี้ (loan_help)
-      adjustCarryover,      // ยอดยกมาสุทธิ (นับใน formula)
-      totalAmount,          // ยอดคำนวณ = gross + ยกมาสุทธิ + ช่วยเดือนนี้
+      slipAmount,           // ยอดสลิปปกติ (gross)
+      proxySlipAmount,      // ยอดสลิปเก็บแทน
+      totalDeducted,
+      adjustThisMonth,
+      adjustCarryover,
+      totalAmount,          // ยอดคำนวณค่าคอมปกติ
       pendingAmount,
       confirmedCount: confirmedSlips.length, pendingCount: pendingSlips.length,
       outstandingDebt,
-      reachedThreshold, commission, remaining, breakdown, settings: { rate, threshold, tiers },
+      reachedThreshold, commission, remaining, breakdown,
+      proxyCommission, proxyRate,
+      settings: { rate, threshold, tiers },
     };
   }
 
