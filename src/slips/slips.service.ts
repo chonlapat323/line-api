@@ -227,6 +227,41 @@ export class SlipsService {
     };
   }
 
+  async getSlipHashes(params: { page: number; limit: number; search?: string; dateFrom?: string; dateTo?: string }) {
+    const skip = (params.page - 1) * params.limit;
+    const conditions: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    if (params.search) {
+      conditions.push(`(u."fullName" ILIKE $${idx} OR u.email ILIKE $${idx})`);
+      values.push(`%${params.search}%`); idx++;
+    }
+    if (params.dateFrom) {
+      conditions.push(`sh."createdAt" >= $${idx}`);
+      values.push(new Date(params.dateFrom + 'T00:00:00')); idx++;
+    }
+    if (params.dateTo) {
+      conditions.push(`sh."createdAt" <= $${idx}`);
+      values.push(new Date(params.dateTo + 'T23:59:59')); idx++;
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const data = await this.prisma.$queryRawUnsafe<any[]>(
+      `SELECT sh.id, sh.hash, sh."userId", sh."createdAt", u."fullName", u.email
+       FROM "SlipHash" sh
+       LEFT JOIN "User" u ON u.id = sh."userId"
+       ${where}
+       ORDER BY sh."createdAt" DESC
+       LIMIT ${params.limit} OFFSET ${skip}`,
+      ...values,
+    );
+    const countRow = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
+      `SELECT COUNT(*) as count FROM "SlipHash" sh LEFT JOIN "User" u ON u.id = sh."userId" ${where}`,
+      ...values,
+    );
+    const total = Number(countRow[0]?.count ?? 0);
+    return { data, total, page: params.page, totalPages: Math.ceil(total / params.limit) };
+  }
+
   private async sendToLine(
     submissionId: string,
     userId: string,

@@ -97,6 +97,19 @@ export class SlipsController {
     return this.slipsService.unblock(id, req.user.id);
   }
 
+  @Get('hashes')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canView' })
+  getSlipHashes(@Query() q: any) {
+    return this.slipsService.getSlipHashes({
+      page: q.page ? parseInt(q.page) : 1,
+      limit: q.limit ? parseInt(q.limit) : 30,
+      search: q.search,
+      dateFrom: q.dateFrom,
+      dateTo: q.dateTo,
+    });
+  }
+
   @Get('duplicate-logs')
   @UseGuards(RolesGuard)
   @Roles({ menu: 'approvals', action: 'canView' })
