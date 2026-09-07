@@ -7,9 +7,11 @@ import { diskStorage, memoryStorage } from 'multer';
 import { extname } from 'path';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { VisitsService } from './visits.service';
 import { SlipService } from '../slip/slip.service';
 import { BankAccountsService } from '../bank-accounts/bank-accounts.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -29,6 +31,7 @@ export class VisitsController {
     private readonly visitsService: VisitsService,
     private readonly slipService: SlipService,
     private readonly bankAccountsService: BankAccountsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -65,19 +68,36 @@ export class VisitsController {
   @Post('verify-slip')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('slip', { storage: memoryStorage() }))
-  async verifySlip(@UploadedFile() file: Express.Multer.File) {
+  async verifySlip(@UploadedFile() file: Express.Multer.File, @Request() req) {
     this.logger.log(`[verify-slip] ── endpoint hit ──`);
     if (!file) {
       this.logger.warn('[verify-slip] no file in request');
       return { success: false, raw: { error: 'no file uploaded' } };
     }
 
-    this.logger.log(`[verify-slip] received: file=${file.originalname} size=${file.size}B (${Math.round(file.size/1024)}KB) mime=${file.mimetype}`);
+    const userId: string = req.user.id;
+    this.logger.log(`[verify-slip] received: file=${file.originalname} size=${file.size}B (${Math.round(file.size/1024)}KB) mime=${file.mimetype} userId=${userId}`);
 
+    // 1. Check if user is currently blocked
+    const block = await this.prisma.slipVerifyBlock.findUnique({ where: { userId } });
+    if (block && block.blockedUntil > new Date()) {
+      this.logger.warn(`[verify-slip] user ${userId} is blocked until ${block.blockedUntil.toISOString()}`);
+      return { success: false, blocked: true, blockedUntil: block.blockedUntil.toISOString() };
+    }
+
+    // 2. Check if this slip image was already used (SHA256 of raw buffer)
+    const hash = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const existing = await this.prisma.slipHash.findUnique({ where: { hash } });
+    if (existing) {
+      this.logger.warn(`[verify-slip] duplicate slip hash=${hash.slice(0, 16)}… userId=${userId}`);
+      return { success: false, duplicate: true };
+    }
+
+    // 3. Call Slip2Go
     const result = await this.slipService.verify(file.buffer, file.originalname);
-
     this.logger.log(`verify-slip result: success=${result.success} transRef=${result.transRef ?? '-'} amount=${result.amount ?? '-'}`);
 
+    // 4. Save file to disk (always, for audit)
     let slipUrl: string | null = null;
     if (file?.buffer) {
       const dir = path.join(process.cwd(), 'uploads', 'line');
@@ -88,16 +108,35 @@ export class VisitsController {
       slipUrl = `${appUrl}/uploads/line/${filename}`;
     }
 
-    let receiverMatch = true;
+    // 5. QR-readable: check receiver + enforce rules
     if (result.success && result.receiverBankId && result.receiverAccountMasked) {
-      receiverMatch = await this.bankAccountsService.checkReceiver(
+      // 5a. Store hash so this slip cannot be reused
+      await this.prisma.slipHash.create({ data: { hash, userId } });
+
+      // 5b. Check receiver against allowed accounts
+      const receiverMatch = await this.bankAccountsService.checkReceiver(
         result.receiverBankId,
         result.receiverAccountMasked,
       );
       this.logger.log(`[verify-slip] receiver check: bankId=${result.receiverBankId} account=${result.receiverAccountMasked} match=${receiverMatch}`);
+
+      if (!receiverMatch) {
+        // Block user for 5 minutes
+        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
+        await this.prisma.slipVerifyBlock.upsert({
+          where: { userId },
+          create: { userId, blockedUntil },
+          update: { blockedUntil },
+        });
+        this.logger.warn(`[verify-slip] receiver mismatch → blocking user ${userId} until ${blockedUntil.toISOString()}`);
+        return { success: false, blocked: true, blockedUntil: blockedUntil.toISOString() };
+      }
+
+      return { ...result, slipUrl, receiverMatch: true };
     }
 
-    return { ...result, slipUrl, receiverMatch };
+    // 6. QR not readable → pending_approval (no hash stored, no block)
+    return { ...result, slipUrl };
   }
 
   @Patch(':id/approve')

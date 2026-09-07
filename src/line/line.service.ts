@@ -109,8 +109,11 @@ export class LineService {
     senderName: string;
     type?: 'trip' | 'slip';
     isEdit?: boolean;
+    slipStatus?: string;
+    isProxy?: boolean;
+    commissionRate?: number;
   }): lineBot.messagingApi.FlexMessage {
-    const { imageUrls, title, price, note, senderName, type, isEdit } = data;
+    const { imageUrls, title, price, note, senderName, type, isEdit, slipStatus, isProxy, commissionRate } = data;
     const isSingle = imageUrls.length === 1;
 
     const priceLabel = type === 'trip' ? 'เปิดบิล' : 'ยอด';
@@ -119,11 +122,41 @@ export class LineService {
     const typeLabelColor = isEdit ? '#dc2626' : '#e83e8c';
     const altPrefix = isEdit ? 'แก้ไขทริป' : type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : 'ส่งรูปสินค้า';
 
-    const copyText = [isEdit ? '[แก้ไข]' : '', title, price ? `${priceLabel}: ${price}` : '', note, `โดย: ${senderName}`].filter(Boolean).join('\n');
+    const slipStatusText = type === 'slip' && slipStatus
+      ? (slipStatus === 'verified' ? 'QR ผ่านแล้ว' : 'รออนุมัติ')
+      : '';
+    const commText = type === 'slip' && commissionRate !== undefined
+      ? (isProxy ? `เก็บแทน • ค่าคอม ${commissionRate}%` : `ปกติ • ค่าคอม ${commissionRate}%`)
+      : '';
+
+    const copyText = [
+      isEdit ? '[แก้ไข]' : '',
+      title,
+      slipStatusText,
+      commText,
+      price ? `${priceLabel}: ${price}` : '',
+      note,
+      `โดย: ${senderName}`,
+    ].filter(Boolean).join('\n');
 
     const infoContents: any[] = [
       ...(typeLabel ? [{ type: 'text', text: typeLabel, size: 'xs', color: typeLabelColor, weight: 'bold' }] : []),
       { type: 'text', text: title, weight: 'bold', size: 'lg', wrap: true },
+      // Slip status badge
+      ...(type === 'slip' && slipStatus ? [{
+        type: 'text',
+        text: slipStatus === 'verified' ? '✅  QR ผ่านแล้ว' : '⏳  รออนุมัติ',
+        size: 'sm',
+        color: slipStatus === 'verified' ? '#16a34a' : '#d97706',
+        weight: 'bold',
+      }] : []),
+      // Commission type line
+      ...(type === 'slip' && commissionRate !== undefined ? [{
+        type: 'text',
+        text: isProxy ? `เก็บแทน • ค่าคอม ${commissionRate}%` : `ปกติ • ค่าคอม ${commissionRate}%`,
+        size: 'xs',
+        color: isProxy ? '#2563eb' : '#16a34a',
+      }] : []),
       ...(price ? [{ type: 'text', text: `${priceLabel}: ${price}`, size: 'md', color: priceColor }] : []),
       ...(note ? [{ type: 'text', text: note, size: 'sm', color: '#666666', wrap: true }] : []),
       { type: 'text', text: `โดย: ${senderName}`, size: 'xs', color: '#aaaaaa' },
@@ -205,6 +238,9 @@ export class LineService {
     senderName: string;
     type?: 'trip' | 'slip';
     isEdit?: boolean;
+    slipStatus?: string;
+    isProxy?: boolean;
+    commissionRate?: number;
   }) {
     const { imageUrls, senderName } = params;
     const primaryImageUrl = imageUrls[0];
@@ -219,6 +255,9 @@ export class LineService {
       senderName,
       type: params.type,
       isEdit: params.isEdit,
+      slipStatus: params.slipStatus,
+      isProxy: params.isProxy,
+      commissionRate: params.commissionRate,
     });
 
     for (const targetUserId of params.targetUserIds) {
@@ -292,6 +331,9 @@ export class LineService {
     note: string;
     type?: 'trip' | 'slip';
     isEdit?: boolean;
+    slipStatus?: string;
+    isProxy?: boolean;
+    commissionRate?: number;
   }) {
     const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
     if (!sender) return { error: 'ไม่พบผู้ใช้' };

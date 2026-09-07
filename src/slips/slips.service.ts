@@ -90,13 +90,56 @@ export class SlipsService {
     });
 
     if (params.amount && !params.isReceiverBlocked) {
-      await this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details);
+      await this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details, params.slipStatus, params.isProxy);
     }
     if (params.slipStatus === 'verified' && params.amount && !params.isReceiverBlocked) {
       await this.applyDebtDeduction(submission.id, params.userId, params.amount, params.userId);
     }
 
     return submission;
+  }
+
+  async updateSlip(id: string, data: {
+    shopName?: string;
+    amount?: number | null;
+    details?: string;
+    slipStatus?: string;
+    isProxy?: boolean;
+  }) {
+    return this.prisma.slipSubmission.update({
+      where: { id },
+      data: {
+        ...(data.shopName !== undefined && { shopName: data.shopName }),
+        ...(data.amount !== undefined && { amount: data.amount }),
+        ...(data.details !== undefined && { details: data.details }),
+        ...(data.slipStatus !== undefined && { slipStatus: data.slipStatus }),
+        ...(data.isProxy !== undefined && { isProxy: data.isProxy }),
+      },
+      include: { user: { select: { fullName: true, email: true } } },
+    });
+  }
+
+  async adminCreate(params: {
+    userId: string;
+    shopName: string;
+    amount?: number | null;
+    details?: string | null;
+    slipUrl: string;
+    slipStatus: string;
+    isProxy?: boolean;
+  }) {
+    return this.prisma.slipSubmission.create({
+      data: {
+        userId: params.userId,
+        shopName: params.shopName,
+        amount: params.amount ?? null,
+        details: params.details ?? null,
+        slipUrl: params.slipUrl,
+        slipStatus: params.slipStatus,
+        isProxy: params.isProxy ?? false,
+      },
+      include: { user: { select: { fullName: true, email: true } } },
+    });
   }
 
   private async sendToLine(
@@ -106,7 +149,17 @@ export class SlipsService {
     shopName: string,
     amount: number,
     details?: string,
+    slipStatus?: string,
+    isProxy?: boolean,
   ) {
+    const [rateRaw, proxyRateRaw] = await Promise.all([
+      this.settings.get('commission_rate'),
+      this.settings.get('proxy_commission_rate'),
+    ]);
+    const normalRate = parseFloat(rateRaw || '0');
+    const proxyRate = parseFloat(proxyRateRaw || '2');
+    const commissionRate = isProxy ? proxyRate : normalRate;
+
     try {
       await this.lineService.sendToGroupsWithUrls({
         senderId: userId,
@@ -116,6 +169,9 @@ export class SlipsService {
         price: `฿${amount.toLocaleString('th-TH')}`,
         note: details ?? '',
         type: 'slip',
+        slipStatus,
+        isProxy,
+        commissionRate,
       });
       await this.prisma.slipSubmission.update({
         where: { id: submissionId },

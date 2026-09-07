@@ -1,4 +1,9 @@
-import { Controller, Post, Get, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Query, Request, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import { SlipsService } from './slips.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -90,6 +95,51 @@ export class SlipsController {
   @Roles({ menu: 'approvals', action: 'canEdit' })
   unblock(@Param('id') id: string, @Request() req) {
     return this.slipsService.unblock(id, req.user.id);
+  }
+
+  @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canEdit' })
+  update(
+    @Param('id') id: string,
+    @Body() body: { shopName?: string; amount?: string; details?: string; slipStatus?: string; isProxy?: string },
+  ) {
+    return this.slipsService.updateSlip(id, {
+      shopName: body.shopName,
+      amount: body.amount !== undefined ? (body.amount === '' ? null : parseFloat(body.amount)) : undefined,
+      details: body.details,
+      slipStatus: body.slipStatus,
+      isProxy: body.isProxy !== undefined ? body.isProxy === 'true' : undefined,
+    });
+  }
+
+  @Post('admin-create')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canEdit' })
+  @UseInterceptors(FileInterceptor('slip', { storage: memoryStorage() }))
+  async adminCreate(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+    @Request() req,
+  ) {
+    let slipUrl = '';
+    if (file?.buffer) {
+      const dir = path.join(process.cwd(), 'uploads', 'line');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const filename = `slip-admin-${Date.now()}-${Math.random().toString(36).slice(2)}${extname(file.originalname)}`;
+      fs.writeFileSync(path.join(dir, filename), file.buffer);
+      const appUrl = process.env.APP_URL || 'http://localhost:3002';
+      slipUrl = `${appUrl}/uploads/line/${filename}`;
+    }
+    return this.slipsService.adminCreate({
+      userId: body.userId,
+      shopName: body.shopName,
+      amount: body.amount ? parseFloat(body.amount) : null,
+      details: body.details || null,
+      slipUrl,
+      slipStatus: body.slipStatus || 'approved',
+      isProxy: body.isProxy === 'true',
+    });
   }
 
   @Patch(':id/approve')
