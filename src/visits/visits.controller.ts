@@ -115,7 +115,13 @@ export class VisitsController {
     // 6. QR-readable: check receiver + enforce rules
     if (result.success && result.receiverBankId && result.receiverAccountMasked) {
 
-      // 5b. Check receiver against allowed accounts
+      // bankId "000" = PromptPay/proxy — Slip2Go cannot identify the bank, skip receiver check
+      if (result.receiverBankId === '000') {
+        this.logger.log(`[verify-slip] receiver bankId=000 (PromptPay) → skip account check`);
+        return { ...result, slipUrl, receiverMatch: true };
+      }
+
+      // Check receiver against allowed accounts
       const receiverMatch = await this.bankAccountsService.checkReceiver(
         result.receiverBankId,
         result.receiverAccountMasked,
