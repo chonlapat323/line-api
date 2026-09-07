@@ -60,7 +60,7 @@ export class Slip2GoStrategy implements ISlipStrategy {
         receiverName: d.receiver?.account?.name,
         receiverBank: d.receiver?.bank?.name,
         receiverBankId: d.receiver?.bank?.id,
-        receiverAccountMasked: d.receiver?.account?.bank?.account,
+        receiverAccountMasked: d.receiver?.account?.bank?.account ?? d.receiver?.account?.proxy?.account ?? null,
         paidAt: d.dateTime,
         raw: d,
       };

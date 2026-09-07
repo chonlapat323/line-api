@@ -109,10 +109,11 @@ export class VisitsController {
       slipUrl = `${appUrl}/uploads/line/${filename}`;
     }
 
-    // 5. QR-readable: check receiver + enforce rules
+    // 5. Store hash now (before QR check) so ALL slip images are tracked regardless of QR result
+    await this.prisma.slipHash.create({ data: { hash, userId } }).catch(() => {});
+
+    // 6. QR-readable: check receiver + enforce rules
     if (result.success && result.receiverBankId && result.receiverAccountMasked) {
-      // 5a. Store hash so this slip cannot be reused
-      await this.prisma.slipHash.create({ data: { hash, userId } });
 
       // 5b. Check receiver against allowed accounts
       const receiverMatch = await this.bankAccountsService.checkReceiver(
@@ -136,7 +137,7 @@ export class VisitsController {
       return { ...result, slipUrl, receiverMatch: true };
     }
 
-    // 6. QR not readable → pending_approval (no hash stored, no block)
+    // 7. QR not readable → pending_approval
     return { ...result, slipUrl };
   }
 
