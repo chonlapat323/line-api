@@ -108,19 +108,21 @@ export class LineService {
     note?: string;
     senderName: string;
     type?: 'trip' | 'slip';
+    isEdit?: boolean;
   }): lineBot.messagingApi.FlexMessage {
-    const { imageUrls, title, price, note, senderName, type } = data;
+    const { imageUrls, title, price, note, senderName, type, isEdit } = data;
     const isSingle = imageUrls.length === 1;
 
     const priceLabel = type === 'trip' ? 'เปิดบิล' : 'ยอด';
     const priceColor = type === 'trip' ? '#2ba05a' : '#e83e8c';
-    const typeLabel = type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : null;
-    const altPrefix = type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : 'ส่งรูปสินค้า';
+    const typeLabel = isEdit ? 'แก้ไขทริป' : type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : null;
+    const typeLabelColor = isEdit ? '#dc2626' : '#e83e8c';
+    const altPrefix = isEdit ? 'แก้ไขทริป' : type === 'trip' ? 'รายงานทริป' : type === 'slip' ? 'ส่งสลิป' : 'ส่งรูปสินค้า';
 
-    const copyText = [title, price ? `${priceLabel}: ${price}` : '', note, `โดย: ${senderName}`].filter(Boolean).join('\n');
+    const copyText = [isEdit ? '[แก้ไข]' : '', title, price ? `${priceLabel}: ${price}` : '', note, `โดย: ${senderName}`].filter(Boolean).join('\n');
 
     const infoContents: any[] = [
-      ...(typeLabel ? [{ type: 'text', text: typeLabel, size: 'xs', color: '#e83e8c', weight: 'bold' }] : []),
+      ...(typeLabel ? [{ type: 'text', text: typeLabel, size: 'xs', color: typeLabelColor, weight: 'bold' }] : []),
       { type: 'text', text: title, weight: 'bold', size: 'lg', wrap: true },
       ...(price ? [{ type: 'text', text: `${priceLabel}: ${price}`, size: 'md', color: priceColor }] : []),
       ...(note ? [{ type: 'text', text: note, size: 'sm', color: '#666666', wrap: true }] : []),
@@ -202,6 +204,7 @@ export class LineService {
     note: string;
     senderName: string;
     type?: 'trip' | 'slip';
+    isEdit?: boolean;
   }) {
     const { imageUrls, senderName } = params;
     const primaryImageUrl = imageUrls[0];
@@ -215,6 +218,7 @@ export class LineService {
       note: params.note,
       senderName,
       type: params.type,
+      isEdit: params.isEdit,
     });
 
     for (const targetUserId of params.targetUserIds) {
@@ -287,6 +291,7 @@ export class LineService {
     price: string;
     note: string;
     type?: 'trip' | 'slip';
+    isEdit?: boolean;
   }) {
     const sender = await this.prisma.user.findUnique({ where: { id: params.senderId } });
     if (!sender) return { error: 'ไม่พบผู้ใช้' };

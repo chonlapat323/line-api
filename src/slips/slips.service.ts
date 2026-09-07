@@ -83,11 +83,11 @@ export class SlipsService {
       },
     });
 
+    if (params.amount) {
+      await this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details);
+    }
     if (params.slipStatus === 'verified' && params.amount) {
-      await Promise.all([
-        this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details),
-        this.applyDebtDeduction(submission.id, params.userId, params.amount, params.userId),
-      ]);
+      await this.applyDebtDeduction(submission.id, params.userId, params.amount, params.userId);
     }
 
     return submission;

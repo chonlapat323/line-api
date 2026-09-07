@@ -648,10 +648,11 @@ export class VisitsService {
     orderAmount?: number | null;
     details?: string;
   }) {
-    const visit = await this.prisma.visitRecord.findUnique({ where: { id } });
+    const visit = await (this.prisma.visitRecord.findUnique as any)({ where: { id } });
     if (!visit) throw new Error('Visit not found');
     if (role !== 'admin' && visit.userId !== userId) throw new Error('Forbidden');
-    return this.prisma.visitRecord.update({
+
+    const updated = await this.prisma.visitRecord.update({
       where: { id },
       data: {
         ...(data.shopName !== undefined ? { shopName: data.shopName } : {}),
@@ -660,6 +661,24 @@ export class VisitsService {
         ...(data.details !== undefined ? { details: data.details } : {}),
       },
     });
+
+    const imageUrls: string[] = (visit as any).imageUrls ?? [];
+    const shopName = data.shopName ?? visit.shopName;
+    const orderAmount = data.orderAmount !== undefined ? data.orderAmount : (visit as any).orderAmount;
+    const details = data.details !== undefined ? data.details : (visit as any).details;
+
+    this.lineService.sendToGroupsWithUrls({
+      senderId: visit.userId,
+      imageUrls,
+      targetUserIds: [visit.userId],
+      title: shopName,
+      price: orderAmount ? `฿${Number(orderAmount).toLocaleString('th-TH')}` : '',
+      note: details ?? '',
+      type: 'trip',
+      isEdit: true,
+    }).catch((err) => this.logger.error(`LINE edit-trip failed: ${err.message}`));
+
+    return updated;
   }
 
   async lastByShop(userId: string, shopName: string) {
