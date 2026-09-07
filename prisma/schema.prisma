@@ -45,6 +45,7 @@ model User {
   approvedSlips          SlipSubmission[]         @relation("SlipApprovals")
   commissionAdjustments  CommissionAdjustment[]   @relation("AdjustmentUser")
   adjustmentsCreated     CommissionAdjustment[]   @relation("AdjustmentCreatedBy")
+  slipAuditLogs          SlipAuditLog[]           @relation("SlipAuditLogs")
 }
 
 model UserLineGroup {
@@ -183,6 +184,19 @@ model VisitRecord {
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model SlipAuditLog {
+  id        String   @id @default(cuid())
+  slipId    String
+  action    String   // submit | admin_create | edit | approve | reject | unblock
+  changedBy String
+  before    Json?
+  after     Json?
+  note      String?
+  createdAt DateTime @default(now())
+
+  changer User @relation("SlipAuditLogs", fields: [changedBy], references: [id])
 }
 
 model SlipHash {

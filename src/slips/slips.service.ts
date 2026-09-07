@@ -96,7 +96,28 @@ export class SlipsService {
       await this.applyDebtDeduction(submission.id, params.userId, params.amount, params.userId);
     }
 
+    await this.logAudit(submission.id, 'submit', params.userId, null, {
+      shopName: params.shopName, amount: params.amount, slipStatus: params.slipStatus, isProxy: params.isProxy,
+    });
+
     return submission;
+  }
+
+  private async logAudit(slipId: string, action: string, changedBy: string, before?: any, after?: any, note?: string) {
+    try {
+      await this.prisma.slipAuditLog.create({
+        data: {
+          slipId,
+          action,
+          changedBy,
+          before: before ?? undefined,
+          after: after ?? undefined,
+          note: note ?? undefined,
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`[audit] failed for slip ${slipId}: ${(err as Error).message}`);
+    }
   }
 
   async updateSlip(id: string, data: {
@@ -105,8 +126,9 @@ export class SlipsService {
     details?: string;
     slipStatus?: string;
     isProxy?: boolean;
-  }) {
-    return this.prisma.slipSubmission.update({
+  }, adminId: string) {
+    const before = await this.prisma.slipSubmission.findUnique({ where: { id } });
+    const updated = await this.prisma.slipSubmission.update({
       where: { id },
       data: {
         ...(data.shopName !== undefined && { shopName: data.shopName }),
@@ -117,6 +139,11 @@ export class SlipsService {
       },
       include: { user: { select: { fullName: true, email: true } } },
     });
+    await this.logAudit(id, 'edit', adminId,
+      { shopName: before?.shopName, amount: before?.amount, details: before?.details, slipStatus: before?.slipStatus, isProxy: before?.isProxy },
+      { shopName: data.shopName, amount: data.amount, details: data.details, slipStatus: data.slipStatus, isProxy: data.isProxy },
+    );
+    return updated;
   }
 
   async adminCreate(params: {
@@ -127,8 +154,8 @@ export class SlipsService {
     slipUrl: string;
     slipStatus: string;
     isProxy?: boolean;
-  }) {
-    return this.prisma.slipSubmission.create({
+  }, adminId: string) {
+    const submission = await this.prisma.slipSubmission.create({
       data: {
         userId: params.userId,
         shopName: params.shopName,
@@ -140,6 +167,43 @@ export class SlipsService {
       },
       include: { user: { select: { fullName: true, email: true } } },
     });
+    await this.logAudit(submission.id, 'admin_create', adminId, null, {
+      shopName: params.shopName, amount: params.amount, slipStatus: params.slipStatus, isProxy: params.isProxy,
+    });
+    return submission;
+  }
+
+  async getAuditLogs(params: { page: number; limit: number; action?: string; dateFrom?: string; dateTo?: string }) {
+    const skip = (params.page - 1) * params.limit;
+    const where: any = {};
+    if (params.action) where.action = params.action;
+    if (params.dateFrom || params.dateTo) {
+      where.createdAt = {};
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom + 'T00:00:00');
+      if (params.dateTo) where.createdAt.lte = new Date(params.dateTo + 'T23:59:59');
+    }
+    const [logs, total] = await Promise.all([
+      this.prisma.slipAuditLog.findMany({
+        where,
+        skip,
+        take: params.limit,
+        orderBy: { createdAt: 'desc' },
+        include: { changer: { select: { fullName: true, email: true } } },
+      }),
+      this.prisma.slipAuditLog.count({ where }),
+    ]);
+    const slipIds = [...new Set(logs.map((l) => l.slipId))];
+    const slips = await this.prisma.slipSubmission.findMany({
+      where: { id: { in: slipIds } },
+      select: { id: true, shopName: true, slipUrl: true, user: { select: { fullName: true } } },
+    });
+    const slipMap = new Map(slips.map((s) => [s.id, s]));
+    return {
+      data: logs.map((l) => ({ ...l, slip: slipMap.get(l.slipId) ?? null })),
+      total,
+      page: params.page,
+      totalPages: Math.ceil(total / params.limit),
+    };
   }
 
   private async sendToLine(
@@ -254,10 +318,12 @@ export class SlipsService {
     if (submission.slipStatus !== 'pending_approval') throw new ForbiddenException('สถานะไม่ถูกต้อง');
 
     if (params.action === 'reject') {
-      return this.prisma.slipSubmission.update({
+      const rejected = await this.prisma.slipSubmission.update({
         where: { id: params.id },
         data: { slipStatus: 'rejected', approvedBy: params.adminId, approvedAt: new Date() },
       });
+      await this.logAudit(params.id, 'reject', params.adminId, { slipStatus: submission.slipStatus }, { slipStatus: 'rejected' });
+      return rejected;
     }
 
     const amount = params.amount ?? submission.amount ?? 0;
@@ -265,6 +331,7 @@ export class SlipsService {
       where: { id: params.id },
       data: { slipStatus: 'approved', amount, approvedBy: params.adminId, approvedAt: new Date() },
     });
+    await this.logAudit(params.id, 'approve', params.adminId, { slipStatus: submission.slipStatus, amount: submission.amount }, { slipStatus: 'approved', amount });
 
     await Promise.all([
       this.sendToLine(submission.id, submission.userId, submission.slipUrl, submission.shopName, amount, submission.details ?? undefined),
@@ -277,14 +344,12 @@ export class SlipsService {
   async unblock(id: string, adminId: string) {
     const slip = await this.prisma.slipSubmission.findUnique({ where: { id } });
     if (!slip) throw new NotFoundException('ไม่พบข้อมูล');
-    return this.prisma.slipSubmission.update({
+    const result = await this.prisma.slipSubmission.update({
       where: { id },
-      data: {
-        isReceiverBlocked: false,
-        slipStatus: 'pending_approval',
-        approvedBy: adminId,
-      },
+      data: { isReceiverBlocked: false, slipStatus: 'pending_approval', approvedBy: adminId },
     });
+    await this.logAudit(id, 'unblock', adminId, { slipStatus: 'blocked' }, { slipStatus: 'pending_approval' });
+    return result;
   }
 
   async getProxyCommission(params: { month: string }) {

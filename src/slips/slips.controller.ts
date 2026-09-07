@@ -97,12 +97,26 @@ export class SlipsController {
     return this.slipsService.unblock(id, req.user.id);
   }
 
+  @Get('audit-logs')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canView' })
+  getAuditLogs(@Query() q: any) {
+    return this.slipsService.getAuditLogs({
+      page: q.page ? parseInt(q.page) : 1,
+      limit: q.limit ? parseInt(q.limit) : 30,
+      action: q.action,
+      dateFrom: q.dateFrom,
+      dateTo: q.dateTo,
+    });
+  }
+
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles({ menu: 'approvals', action: 'canEdit' })
   update(
     @Param('id') id: string,
     @Body() body: { shopName?: string; amount?: string; details?: string; slipStatus?: string; isProxy?: string },
+    @Request() req,
   ) {
     return this.slipsService.updateSlip(id, {
       shopName: body.shopName,
@@ -110,7 +124,7 @@ export class SlipsController {
       details: body.details,
       slipStatus: body.slipStatus,
       isProxy: body.isProxy !== undefined ? body.isProxy === 'true' : undefined,
-    });
+    }, req.user.id);
   }
 
   @Post('admin-create')
@@ -139,7 +153,7 @@ export class SlipsController {
       slipUrl,
       slipStatus: body.slipStatus || 'approved',
       isProxy: body.isProxy === 'true',
-    });
+    }, req.user.id);
   }
 
   @Patch(':id/approve')
