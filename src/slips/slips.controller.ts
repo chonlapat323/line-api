@@ -97,6 +97,18 @@ export class SlipsController {
     return this.slipsService.unblock(id, req.user.id);
   }
 
+  @Get('duplicate-logs')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canView' })
+  getDuplicateLogs(@Query() q: any) {
+    return this.slipsService.getDuplicateLogs({
+      page: q.page ? parseInt(q.page) : 1,
+      limit: q.limit ? parseInt(q.limit) : 30,
+      dateFrom: q.dateFrom,
+      dateTo: q.dateTo,
+    });
+  }
+
   @Get('audit-logs')
   @UseGuards(RolesGuard)
   @Roles({ menu: 'approvals', action: 'canView' })

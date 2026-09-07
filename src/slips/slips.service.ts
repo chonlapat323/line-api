@@ -173,6 +173,27 @@ export class SlipsService {
     return submission;
   }
 
+  async getDuplicateLogs(params: { page: number; limit: number; dateFrom?: string; dateTo?: string }) {
+    const skip = (params.page - 1) * params.limit;
+    const where: any = {};
+    if (params.dateFrom || params.dateTo) {
+      where.attemptedAt = {};
+      if (params.dateFrom) where.attemptedAt.gte = new Date(params.dateFrom + 'T00:00:00');
+      if (params.dateTo) where.attemptedAt.lte = new Date(params.dateTo + 'T23:59:59');
+    }
+    const [data, total] = await Promise.all([
+      this.prisma.slipDuplicateLog.findMany({
+        where,
+        skip,
+        take: params.limit,
+        orderBy: { attemptedAt: 'desc' },
+        include: { user: { select: { fullName: true, email: true } } },
+      }),
+      this.prisma.slipDuplicateLog.count({ where }),
+    ]);
+    return { data, total, page: params.page, totalPages: Math.ceil(total / params.limit) };
+  }
+
   async getAuditLogs(params: { page: number; limit: number; action?: string; dateFrom?: string; dateTo?: string }) {
     const skip = (params.page - 1) * params.limit;
     const where: any = {};

@@ -90,6 +90,7 @@ export class VisitsController {
     const existing = await this.prisma.slipHash.findUnique({ where: { hash } });
     if (existing) {
       this.logger.warn(`[verify-slip] duplicate slip hash=${hash.slice(0, 16)}… userId=${userId}`);
+      await this.prisma.slipDuplicateLog.create({ data: { userId, hash } }).catch(() => {});
       return { success: false, duplicate: true };
     }
 

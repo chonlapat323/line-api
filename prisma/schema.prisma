@@ -46,6 +46,7 @@ model User {
   commissionAdjustments  CommissionAdjustment[]   @relation("AdjustmentUser")
   adjustmentsCreated     CommissionAdjustment[]   @relation("AdjustmentCreatedBy")
   slipAuditLogs          SlipAuditLog[]           @relation("SlipAuditLogs")
+  slipDuplicateLogs      SlipDuplicateLog[]       @relation("DuplicateLogs")
 }
 
 model UserLineGroup {
@@ -184,6 +185,15 @@ model VisitRecord {
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model SlipDuplicateLog {
+  id          String   @id @default(cuid())
+  userId      String
+  hash        String
+  attemptedAt DateTime @default(now())
+
+  user User @relation("DuplicateLogs", fields: [userId], references: [id])
 }
 
 model SlipAuditLog {
