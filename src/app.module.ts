@@ -10,8 +10,9 @@ import { CommissionPaymentsModule } from './commission-payments/commission-payme
 import { CommissionAdjustmentsModule } from './commission-adjustments/commission-adjustments.module';
 import { RolesModule } from './roles/roles.module';
 import { SlipsModule } from './slips/slips.module';
+import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, LineModule, SettingsModule, VisitsModule, GoogleModule, CommissionPaymentsModule, CommissionAdjustmentsModule, RolesModule, SlipsModule],
+  imports: [PrismaModule, AuthModule, UsersModule, LineModule, SettingsModule, VisitsModule, GoogleModule, CommissionPaymentsModule, CommissionAdjustmentsModule, RolesModule, SlipsModule, BankAccountsModule],
 })
 export class AppModule {}

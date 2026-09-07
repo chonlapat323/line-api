@@ -115,19 +115,33 @@ model SlipSubmission {
   amount      Float?
   details     String?
   slipUrl     String
-  slipStatus    String    // "verified" | "pending_approval" | "approved" | "rejected"
+  slipStatus    String    // "verified" | "pending_approval" | "approved" | "rejected" | "blocked"
   transRef      String?
   lineStatus    String?   // "sent" | "failed"
   approvedBy    String?
   approvedAt    DateTime?
-  debtDeducted  Float     @default(0) // ยอดที่หักคืนหนี้จาก slip นี้
+  debtDeducted  Float     @default(0)
   province    String?
   district    String?
   isProxy     Boolean   @default(false)
+  isReceiverBlocked   Boolean   @default(false)
+  receiverBankId      String?
+  receiverAccountMasked String?
   createdAt   DateTime  @default(now())
 
   user     User  @relation("SlipSubmissions", fields: [userId], references: [id])
   approver User? @relation("SlipApprovals", fields: [approvedBy], references: [id])
+}
+
+model AllowedBankAccount {
+  id            String   @id @default(cuid())
+  label         String
+  bankId        String
+  bankName      String
+  accountNumber String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model CommissionAdjustment {

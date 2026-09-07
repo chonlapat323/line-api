@@ -67,6 +67,9 @@ export class SlipsService {
     province?: string;
     district?: string;
     isProxy?: boolean;
+    isReceiverBlocked?: boolean;
+    receiverBankId?: string;
+    receiverAccountMasked?: string;
   }) {
     const submission = await this.prisma.slipSubmission.create({
       data: {
@@ -80,13 +83,16 @@ export class SlipsService {
         province: params.province ?? null,
         district: params.district ?? null,
         isProxy: params.isProxy ?? false,
+        isReceiverBlocked: params.isReceiverBlocked ?? false,
+        receiverBankId: params.receiverBankId ?? null,
+        receiverAccountMasked: params.receiverAccountMasked ?? null,
       },
     });
 
-    if (params.amount) {
+    if (params.amount && !params.isReceiverBlocked) {
       await this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details);
     }
-    if (params.slipStatus === 'verified' && params.amount) {
+    if (params.slipStatus === 'verified' && params.amount && !params.isReceiverBlocked) {
       await this.applyDebtDeduction(submission.id, params.userId, params.amount, params.userId);
     }
 
@@ -130,6 +136,7 @@ export class SlipsService {
     roleId?: string;
     filterUserId?: string;
     status?: string;
+    blocked?: string;
     search?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -152,6 +159,8 @@ export class SlipsService {
     const where: any = canViewAll ? {} : { userId };
     if (params.filterUserId) where.userId = params.filterUserId;
     if (params.status) where.slipStatus = params.status;
+    if (params.blocked === 'true') where.isReceiverBlocked = true;
+    else if (params.blocked === 'false') where.isReceiverBlocked = false;
     if (params.search) {
       where.OR = [
         { shopName: { contains: params.search, mode: 'insensitive' } },
@@ -207,6 +216,19 @@ export class SlipsService {
     ]);
 
     return updated;
+  }
+
+  async unblock(id: string, adminId: string) {
+    const slip = await this.prisma.slipSubmission.findUnique({ where: { id } });
+    if (!slip) throw new NotFoundException('ไม่พบข้อมูล');
+    return this.prisma.slipSubmission.update({
+      where: { id },
+      data: {
+        isReceiverBlocked: false,
+        slipStatus: 'pending_approval',
+        approvedBy: adminId,
+      },
+    });
   }
 
   async getProxyCommission(params: { month: string }) {

@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { VisitsService } from './visits.service';
 import { SlipService } from '../slip/slip.service';
+import { BankAccountsService } from '../bank-accounts/bank-accounts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -27,6 +28,7 @@ export class VisitsController {
   constructor(
     private readonly visitsService: VisitsService,
     private readonly slipService: SlipService,
+    private readonly bankAccountsService: BankAccountsService,
   ) {}
 
   @Post()
@@ -86,7 +88,16 @@ export class VisitsController {
       slipUrl = `${appUrl}/uploads/line/${filename}`;
     }
 
-    return { ...result, slipUrl };
+    let receiverMatch = true;
+    if (result.success && result.receiverBankId && result.receiverAccountMasked) {
+      receiverMatch = await this.bankAccountsService.checkReceiver(
+        result.receiverBankId,
+        result.receiverAccountMasked,
+      );
+      this.logger.log(`[verify-slip] receiver check: bankId=${result.receiverBankId} account=${result.receiverAccountMasked} match=${receiverMatch}`);
+    }
+
+    return { ...result, slipUrl, receiverMatch };
   }
 
   @Patch(':id/approve')

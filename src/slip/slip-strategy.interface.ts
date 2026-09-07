@@ -6,6 +6,8 @@ export interface SlipVerifyResult {
   senderBank?: string;
   receiverName?: string;
   receiverBank?: string;
+  receiverBankId?: string;
+  receiverAccountMasked?: string;
   paidAt?: string;
   raw?: any;
 }

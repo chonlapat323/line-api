@@ -21,6 +21,9 @@ export class SlipsController {
       province?: string;
       district?: string;
       isProxy?: boolean;
+      isReceiverBlocked?: boolean;
+      receiverBankId?: string;
+      receiverAccountMasked?: string;
     },
     @Request() req,
   ) {
@@ -35,6 +38,9 @@ export class SlipsController {
       province: body.province || '',
       district: body.district || '',
       isProxy: body.isProxy ?? false,
+      isReceiverBlocked: body.isReceiverBlocked ?? false,
+      receiverBankId: body.receiverBankId || null,
+      receiverAccountMasked: body.receiverAccountMasked || null,
     });
   }
 
@@ -46,6 +52,7 @@ export class SlipsController {
       roleId: req.user.roleId,
       filterUserId: q.filterUserId,
       status: q.status,
+      blocked: q.blocked,
       search: q.search,
       dateFrom: q.dateFrom,
       dateTo: q.dateTo,
@@ -76,6 +83,13 @@ export class SlipsController {
       requesterId: req.user.id,
       requesterRole: req.user.role,
     });
+  }
+
+  @Patch(':id/unblock')
+  @UseGuards(RolesGuard)
+  @Roles({ menu: 'approvals', action: 'canEdit' })
+  unblock(@Param('id') id: string, @Request() req) {
+    return this.slipsService.unblock(id, req.user.id);
   }
 
   @Patch(':id/approve')
