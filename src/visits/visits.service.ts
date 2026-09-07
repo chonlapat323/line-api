@@ -193,7 +193,7 @@ export class VisitsService {
     const roleName = params.roleName ?? role;
     const skip = (page - 1) * limit;
 
-    const viewAll = ['admin', 'manager', 'accountant'].includes(roleName);
+    const viewAll = params.role === 'admin';
     const where: any = {};
     if (!viewAll) where.userId = userId;
     else if (params.filterUserId) where.userId = params.filterUserId;
