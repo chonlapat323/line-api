@@ -180,6 +180,7 @@ export class VisitsController {
       page: q.page ? parseInt(q.page) : 1,
       limit: q.limit ? parseInt(q.limit) : 100,
       province: q.province,
+      district: q.district,
       result: q.result,
       tripType: q.tripType,
       visitType: q.visitType,

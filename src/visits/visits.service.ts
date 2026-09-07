@@ -178,6 +178,7 @@ export class VisitsService {
     page: number;
     limit: number;
     province?: string;
+    district?: string;
     result?: string;
     tripType?: string;
     visitType?: string;
@@ -197,6 +198,7 @@ export class VisitsService {
     if (!viewAll) where.userId = userId;
     else if (params.filterUserId) where.userId = params.filterUserId;
     if (params.province) where.province = params.province;
+    if (params.district) where.district = params.district;
     if (params.result) where.result = params.result;
     if (params.tripType) where.tripType = params.tripType;
     if (params.slipStatus) where.slipStatus = params.slipStatus;
