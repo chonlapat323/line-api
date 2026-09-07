@@ -64,8 +64,9 @@ export class VisitsController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('slip', { storage: memoryStorage() }))
   async verifySlip(@UploadedFile() file: Express.Multer.File) {
+    this.logger.log(`[verify-slip] ── endpoint hit ──`);
     if (!file) {
-      this.logger.warn('verify-slip called with no file');
+      this.logger.warn('[verify-slip] no file in request');
       return { success: false, raw: { error: 'no file uploaded' } };
     }
 

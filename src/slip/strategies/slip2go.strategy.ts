@@ -11,9 +11,13 @@ export class Slip2GoStrategy implements ISlipStrategy {
   constructor(private readonly settings: SettingsService) {}
 
   async verify(imageBuffer: Buffer, filename: string): Promise<SlipVerifyResult> {
+    this.logger.log(`[Slip2Go] ── verify called ──`);
+
     const secret = await this.settings.get('slip2go_secret');
+    this.logger.log(`[Slip2Go] secret from DB: ${secret ? `***${secret.slice(-6)} (length=${secret.length})` : 'NULL'}`);
+
     if (!secret) {
-      this.logger.warn('slip2go_secret not configured — skipping verify');
+      this.logger.warn('[Slip2Go] slip2go_secret not configured — skipping verify');
       return { success: false, raw: { error: 'slip2go_secret not configured' } };
     }
 
@@ -21,7 +25,8 @@ export class Slip2GoStrategy implements ISlipStrategy {
     const imageBase64 = `data:${mime};base64,${imageBuffer.toString('base64')}`;
     const base64Kb = Math.round(imageBase64.length / 1024);
 
-    this.logger.log(`[Slip2Go] verify start: file=${filename} buffer=${imageBuffer.length}B base64=${base64Kb}KB`);
+    this.logger.log(`[Slip2Go] file=${filename} buffer=${imageBuffer.length}B base64=${base64Kb}KB mime=${mime}`);
+    this.logger.log(`[Slip2Go] POST → ${this.BASE_URL}/api/verify-slip/qr-base64/info`);
 
     try {
       const { data: res, status } = await axios.post(
@@ -37,9 +42,10 @@ export class Slip2GoStrategy implements ISlipStrategy {
       );
 
       this.logger.log(`[Slip2Go] HTTP ${status} | code=${res?.code} | message=${res?.message ?? '-'} | hasData=${!!res?.data}`);
+      this.logger.log(`[Slip2Go] raw response: ${JSON.stringify(res).slice(0, 800)}`);
 
       if (res.code !== '200000' || !res.data) {
-        this.logger.warn(`[Slip2Go] no QR found | code=${res.code} | message=${res.message ?? '-'} | raw=${JSON.stringify(res).slice(0, 500)}`);
+        this.logger.warn(`[Slip2Go] verify failed | code=${res.code} | message=${res.message ?? '-'}`);
         return { success: false, raw: res };
       }
 
@@ -59,7 +65,7 @@ export class Slip2GoStrategy implements ISlipStrategy {
     } catch (err: any) {
       const status = err?.response?.status;
       const errData = err?.response?.data ?? err?.message;
-      this.logger.error(`[Slip2Go] request failed | HTTP ${status ?? '?'} | body=${JSON.stringify(errData).slice(0, 500)}`);
+      this.logger.error(`[Slip2Go] request failed | HTTP ${status ?? '?'} | body=${JSON.stringify(errData).slice(0, 800)}`);
       return { success: false, raw: errData };
     }
   }
