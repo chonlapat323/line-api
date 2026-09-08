@@ -94,7 +94,9 @@ export class RolesService implements OnModuleInit {
     for (const r of roles) {
       await this.prisma.role.upsert({
         where: { name: r.name },
-        update: { label: r.label, isActive: r.isActive },
+        // isSystem roles (admin) always get re-synced to the full, current menu list —
+        // otherwise a role created before a new menu was added would never gain access to it.
+        update: r.isSystem ? { label: r.label, isActive: r.isActive, permissions: r.permissions } : { label: r.label, isActive: r.isActive },
         create: r,
       });
     }
