@@ -20,6 +20,7 @@ export const MENUS: { menu: string; label: string }[] = [
   { menu: 'roles', label: 'จัดการสิทธิ์' },
   { menu: 'settings', label: 'ตั้งค่า' },
   { menu: 'line', label: 'LINE' },
+  { menu: 'announcements', label: 'ประกาศ' },
 ];
 
 export function buildFullPermissions(partial: Partial<MenuPermission>[] = []): MenuPermission[] {

@@ -7,6 +7,8 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { LineService } from './line.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { Response, Request as ExpressRequest } from 'express';
 
 const imageStorage = diskStorage({
@@ -70,5 +72,29 @@ export class LineController {
       price: body.price || '',
       note: body.note || '',
     });
+  }
+
+  @Post('announcements')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'announcements', action: 'canEdit' })
+  async sendAnnouncement(
+    @Body() body: { title: string; bodyHtml: string; imageUrl?: string; buttonText?: string; buttonUrl?: string },
+    @Request() req,
+  ) {
+    return this.lineService.broadcastAnnouncement({
+      senderId: req.user.id,
+      title: body.title,
+      bodyHtml: body.bodyHtml,
+      imageUrl: body.imageUrl,
+      buttonText: body.buttonText,
+      buttonUrl: body.buttonUrl,
+    });
+  }
+
+  @Get('announcements')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'announcements', action: 'canView' })
+  getAnnouncements() {
+    return this.lineService.getAnnouncements();
   }
 }

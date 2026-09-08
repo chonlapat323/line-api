@@ -47,6 +47,7 @@ model User {
   adjustmentsCreated     CommissionAdjustment[]   @relation("AdjustmentCreatedBy")
   slipAuditLogs          SlipAuditLog[]           @relation("SlipAuditLogs")
   slipDuplicateLogs      SlipDuplicateLog[]       @relation("DuplicateLogs")
+  announcements          Announcement[]           @relation("AnnouncementSender")
 }
 
 model UserLineGroup {
@@ -207,6 +208,21 @@ model SlipAuditLog {
   createdAt DateTime @default(now())
 
   changer User @relation("SlipAuditLogs", fields: [changedBy], references: [id])
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  bodyHtml    String
+  imageUrl    String?
+  buttonText  String?
+  buttonUrl   String?
+  status      String   @default("sent") // sent | failed
+  errorMessage String?
+  sentById    String
+  createdAt   DateTime @default(now())
+
+  sentBy User @relation("AnnouncementSender", fields: [sentById], references: [id])
 }
 
 model SlipHash {

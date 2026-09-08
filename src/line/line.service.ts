@@ -362,4 +362,165 @@ export class LineService {
     const users = await this.prisma.user.findMany({ select: { id: true } });
     return this.sendToGroups({ ...params, targetUserIds: users.map((u) => u.id) });
   }
+
+  // ── Announcements: broadcast to everyone who added the LINE OA as a friend ──
+
+  private decodeEntities(s: string): string {
+    return s
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+
+  // Parses simple inline formatting (bold/italic/underline) from editor HTML into Flex text spans.
+  // Nested marks (e.g. bold+italic together) degrade to the outer mark only — acceptable for announcement copy.
+  private parseInlineSpans(html: string): any[] {
+    const spans: any[] = [];
+    const re = /<(strong|b|em|i|u)>([\s\S]*?)<\/\1>|([^<]+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html))) {
+      if (m[3] !== undefined) {
+        const text = this.decodeEntities(m[3]);
+        if (text) spans.push({ type: 'span', text });
+      } else {
+        const tag = m[1].toLowerCase();
+        const inner = this.decodeEntities(m[2].replace(/<[^>]+>/g, ''));
+        if (!inner) continue;
+        const span: any = { type: 'span', text: inner };
+        if (tag === 'strong' || tag === 'b') span.weight = 'bold';
+        if (tag === 'em' || tag === 'i') span.style = 'italic';
+        if (tag === 'u') span.decoration = 'underline';
+        spans.push(span);
+      }
+    }
+    if (!spans.length) {
+      const plain = this.decodeEntities(html.replace(/<[^>]+>/g, ''));
+      if (plain) spans.push({ type: 'span', text: plain });
+    }
+    return spans;
+  }
+
+  // Converts editor HTML (paragraphs, bullet/numbered lists, bold/italic/underline) into Flex body contents.
+  private htmlToFlexContents(html: string): any[] {
+    const contents: any[] = [];
+    const blockRe = /<p>([\s\S]*?)<\/p>|<ul>([\s\S]*?)<\/ul>|<ol>([\s\S]*?)<\/ol>/g;
+    let m: RegExpExecArray | null;
+    let matched = false;
+    while ((m = blockRe.exec(html))) {
+      matched = true;
+      if (m[1] !== undefined) {
+        const inner = m[1].trim();
+        contents.push(
+          inner
+            ? { type: 'text', wrap: true, size: 'sm', contents: this.parseInlineSpans(inner) }
+            : { type: 'text', text: ' ', size: 'xs' },
+        );
+      } else if (m[2] !== undefined) {
+        const liRe = /<li>([\s\S]*?)<\/li>/g;
+        let lm: RegExpExecArray | null;
+        while ((lm = liRe.exec(m[2]))) {
+          contents.push({
+            type: 'text', wrap: true, size: 'sm',
+            contents: [{ type: 'span', text: '•  ' }, ...this.parseInlineSpans(lm[1].trim())],
+          });
+        }
+      } else if (m[3] !== undefined) {
+        const liRe = /<li>([\s\S]*?)<\/li>/g;
+        let lm: RegExpExecArray | null;
+        let idx = 1;
+        while ((lm = liRe.exec(m[3]))) {
+          contents.push({
+            type: 'text', wrap: true, size: 'sm',
+            contents: [{ type: 'span', text: `${idx}.  ` }, ...this.parseInlineSpans(lm[1].trim())],
+          });
+          idx++;
+        }
+      }
+    }
+    if (!matched) {
+      const plain = html.replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').trim();
+      for (const line of plain.split('\n')) {
+        contents.push({ type: 'text', text: line || ' ', wrap: true, size: 'sm' });
+      }
+    }
+    return contents;
+  }
+
+  private buildAnnouncementFlex(params: {
+    title: string; bodyHtml: string; imageUrl?: string; buttonText?: string; buttonUrl?: string;
+  }): lineBot.messagingApi.FlexMessage {
+    const bodyContents = this.htmlToFlexContents(params.bodyHtml);
+
+    const contents: any = {
+      type: 'bubble',
+      ...(params.imageUrl ? {
+        hero: { type: 'image', url: params.imageUrl, size: 'full', aspectRatio: '20:13', aspectMode: 'cover' },
+      } : {}),
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '📢 ประกาศ', size: 'xs', color: '#16a34a', weight: 'bold' },
+          { type: 'text', text: params.title, weight: 'bold', size: 'lg', wrap: true },
+          { type: 'separator', margin: 'md' },
+          ...bodyContents,
+        ],
+      },
+      ...(params.buttonText && params.buttonUrl ? {
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [{
+            type: 'button',
+            style: 'primary',
+            color: '#16a34a',
+            action: { type: 'uri', label: params.buttonText.slice(0, 40), uri: params.buttonUrl },
+          }],
+        },
+      } : {}),
+    };
+
+    return { type: 'flex', altText: `📢 ${params.title}`.slice(0, 400), contents };
+  }
+
+  async broadcastAnnouncement(params: {
+    senderId: string;
+    title: string;
+    bodyHtml: string;
+    imageUrl?: string;
+    buttonText?: string;
+    buttonUrl?: string;
+  }) {
+    const client = this.getClient();
+    const flexMsg = this.buildAnnouncementFlex(params);
+    const baseData = {
+      title: params.title,
+      bodyHtml: params.bodyHtml,
+      imageUrl: params.imageUrl || null,
+      buttonText: params.buttonText || null,
+      buttonUrl: params.buttonUrl || null,
+      sentById: params.senderId,
+    };
+
+    try {
+      await client.broadcast({ messages: [flexMsg] });
+      return this.prisma.announcement.create({ data: { ...baseData, status: 'sent' } });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      await this.prisma.announcement.create({ data: { ...baseData, status: 'failed', errorMessage } });
+      throw new Error(errorMessage);
+    }
+  }
+
+  async getAnnouncements() {
+    return this.prisma.announcement.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { sentBy: { select: { fullName: true } } },
+    });
+  }
 }
