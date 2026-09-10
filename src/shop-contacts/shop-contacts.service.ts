@@ -39,6 +39,13 @@ export class ShopContactsService {
     });
   }
 
+  async list() {
+    return this.prisma.shopContact.findMany({
+      select: { id: true, contactName: true, updatedAt: true },
+      orderBy: { contactName: 'asc' },
+    });
+  }
+
   async getStatus() {
     const [count, latest] = await Promise.all([
       this.prisma.shopContact.count(),

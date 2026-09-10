@@ -29,4 +29,11 @@ export class ShopContactsController {
   status() {
     return this.shopContactsService.getStatus();
   }
+
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles({ menu: 'settings', action: 'canView' })
+  list() {
+    return this.shopContactsService.list();
+  }
 }
