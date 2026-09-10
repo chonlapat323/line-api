@@ -51,7 +51,7 @@ export class FlowAccountService {
   }
 
   // Fetches one page of contacts. FlowAccount caps pageSize at 200.
-  async listContactsPage(currentPage: number, pageSize = 200): Promise<{ contacts: FlowAccountContact[]; hasMore: boolean }> {
+  async listContactsPage(currentPage: number, pageSize = 200): Promise<{ contacts: FlowAccountContact[]; hasMore: boolean; total: number | null }> {
     const token = await this.getToken();
     const url = `${this.baseUrl}/contacts?currentPage=${currentPage}&pageSize=${pageSize}`;
 
@@ -66,6 +66,7 @@ export class FlowAccountService {
     const data = JSON.parse(rawBody);
     const items: unknown =
       Array.isArray(data) ? data
+      : Array.isArray(data.data?.list) ? data.data.list
       : Array.isArray(data.data) ? data.data
       : Array.isArray(data.data?.data) ? data.data.data
       : Array.isArray(data.contacts) ? data.contacts
@@ -82,7 +83,12 @@ export class FlowAccountService {
       .map((c) => ({ contactId: c.contactId ?? c.id, contactName: c.contactName }))
       .filter((c) => c.contactId != null && c.contactName);
 
-    return { contacts, hasMore: items.length === pageSize };
+    const total: number | null = typeof data.data?.total === 'number' ? data.data.total : null;
+    const hasMore = total != null
+      ? currentPage * pageSize < total
+      : items.length === pageSize;
+
+    return { contacts, hasMore, total };
   }
 
   // Pages through the entire contact list. Safety cap avoids an infinite loop if FlowAccount's
