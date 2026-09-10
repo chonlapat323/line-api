@@ -225,6 +225,16 @@ model Announcement {
   sentBy User @relation("AnnouncementSender", fields: [sentById], references: [id])
 }
 
+model ShopContact {
+  id                   String   @id @default(cuid())
+  flowAccountContactId Int      @unique
+  contactName          String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([contactName])
+}
+
 model SlipHash {
   id        String   @id @default(cuid())
   hash      String   @unique
