@@ -64,8 +64,21 @@ export class FlowAccountService {
     }
 
     const data = JSON.parse(rawBody);
-    const items: any[] = data.data ?? data.contacts ?? data.items ?? [];
-    const contacts: FlowAccountContact[] = items
+    const items: unknown =
+      Array.isArray(data) ? data
+      : Array.isArray(data.data) ? data.data
+      : Array.isArray(data.data?.data) ? data.data.data
+      : Array.isArray(data.contacts) ? data.contacts
+      : Array.isArray(data.items) ? data.items
+      : Array.isArray(data.result) ? data.result
+      : null;
+
+    if (!Array.isArray(items)) {
+      this.logger.error(`[listContactsPage] Unexpected response shape. Keys: ${Object.keys(data).join(', ')}. Body: ${rawBody.slice(0, 1000)}`);
+      throw new Error('FlowAccount list contacts: unrecognized response shape (see logs for raw body)');
+    }
+
+    const contacts: FlowAccountContact[] = (items as any[])
       .map((c) => ({ contactId: c.contactId ?? c.id, contactName: c.contactName }))
       .filter((c) => c.contactId != null && c.contactName);
 
