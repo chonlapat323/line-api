@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 uploads
+logs
 prisma/update-role.ts
 prisma/cleanup-mock.ts
 *.json.key

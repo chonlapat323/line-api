@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LineService } from '../line/line.service';
 import { GoogleService } from '../google/google.service';
 import { calculateCommission, classifyVisits } from './commission.utils';
+import { visitTrace } from '../common/visit-trace.util';
 
 @Injectable()
 export class VisitsService {
@@ -35,10 +36,14 @@ export class VisitsService {
     slipUrl?: string | null;
     slipStatus?: string | null;
     transRef?: string | null;
+    requestId?: string;
   }) {
+    const requestId = params.requestId;
     const appUrl = process.env.APP_URL || 'http://localhost:3002';
     const imageUrls = params.files.map((f) => `${appUrl}/uploads/line/${f.filename}`);
 
+    let t = Date.now();
+    visitTrace('db_insert_start', { requestId });
     const record = await (this.prisma.visitRecord.create as any)({
       data: {
         userId: params.userId,
@@ -61,6 +66,7 @@ export class VisitsService {
         transRef: params.transRef ?? null,
       },
     });
+    visitTrace('db_insert_done', { requestId, durationMs: Date.now() - t, visitId: record.id });
 
     const tripMap: Record<string, string> = {
       plan: 'ตามแผน', off_plan: 'นอกแผน',
@@ -94,6 +100,8 @@ export class VisitsService {
     const mapsUrl = params.latitude && params.longitude
       ? `https://maps.google.com/?q=${params.latitude},${params.longitude}`
       : '';
+    t = Date.now();
+    visitTrace('sheets_append_start', { requestId });
     try {
       const visitSheetSetting = await this.prisma.setting.findUnique({ where: { key: 'visit_sheet_id' } });
       const visitSheetId = visitSheetSetting?.value || process.env.GOOGLE_SHEET_ID || '';
@@ -125,12 +133,16 @@ export class VisitsService {
           'สรุปผล', 'ใบ X-Ray ส่ง (1รูป)',
         ],
       );
+      visitTrace('sheets_append_done', { requestId, durationMs: Date.now() - t, success: true });
     } catch (e) {
       this.logger.warn(`Google Sheets append failed: ${e.message} | status=${e.status ?? e.code} | errors=${JSON.stringify(e.errors ?? e.response?.data ?? '-')}`);
+      visitTrace('sheets_append_done', { requestId, durationMs: Date.now() - t, success: false, error: e.message });
     }
 
     // Log to commission sheet if QR-verified slip (no admin approval needed)
     if (params.result === 'buy' && params.slipStatus === 'verified') {
+      t = Date.now();
+      visitTrace('commission_sheet_append_start', { requestId });
       try {
         const sheetSetting = await this.prisma.setting.findUnique({ where: { key: 'commission_sheet_id' } });
         const sheetId = sheetSetting?.value;
@@ -150,12 +162,16 @@ export class VisitsService {
             ['ประทับเวลา', 'ที่อยู่อีเมล', 'สลิปธนาคาร', 'หมายเหตุ (ถ้ามี)', 'จังหวัด', 'ชื่อร้าน', 'ยอดเงิน (บาท)', 'ลูกค้า'],
           );
         }
+        visitTrace('commission_sheet_append_done', { requestId, durationMs: Date.now() - t, success: true });
       } catch (e) {
         this.logger.warn(`Commission sheet log failed: ${e.message}`);
+        visitTrace('commission_sheet_append_done', { requestId, durationMs: Date.now() - t, success: false, error: e.message });
       }
     }
 
     // Send to LINE Group
+    t = Date.now();
+    visitTrace('line_push_start', { requestId });
     const lineResult = await this.lineService.sendToGroups({
       senderId: params.userId,
       files: params.files,
@@ -167,6 +183,7 @@ export class VisitsService {
       note: noteParts,
       type: 'trip',
     });
+    visitTrace('line_push_done', { requestId, durationMs: Date.now() - t, lineResult });
 
     return { record, lineResult };
   }

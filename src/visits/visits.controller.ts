@@ -14,6 +14,7 @@ import { BankAccountsService } from '../bank-accounts/bank-accounts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { parseAmount } from '../common/parse-amount.util';
+import { visitTrace, genRequestId } from '../common/visit-trace.util';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
@@ -43,27 +44,58 @@ export class VisitsController {
     @Body() body: any,
     @Request() req,
   ) {
-    return this.visitsService.create({
-      userId: req.user.id,
-      files,
-      shopName: body.shopName,
-      province: body.province,
-      district: body.district || '',
-      shopNote: body.shopNote || '',
-      shopPhone: body.shopPhone || '',
-      latitude: parseFloat(body.latitude),
-      longitude: parseFloat(body.longitude),
-      tripType: body.tripType || '',
-      customerType: body.customerType,
-      visitType: body.visitType || '',
-      result: body.result || '',
-      details: body.details || '',
-      orderAmount: parseAmount(body.orderAmount),
-      userEmail: req.user.email,
-      slipUrl: body.slipUrl || null,
-      slipStatus: body.slipStatus || null,
-      transRef: body.transRef || null,
+    const requestId = genRequestId();
+    const startedAt = Date.now();
+    visitTrace('request_received', {
+      requestId,
+      userId: req.user?.id,
+      userEmail: req.user?.email,
+      shopName: body?.shopName,
+      fileCount: files?.length ?? 0,
+      fileSizesBytes: (files ?? []).map((f) => f.size),
+      totalFileBytes: (files ?? []).reduce((s, f) => s + (f.size || 0), 0),
+      contentLengthHeader: req.headers?.['content-length'],
+      ip: req.ip,
     });
+
+    try {
+      const result = await this.visitsService.create({
+        userId: req.user.id,
+        files,
+        shopName: body.shopName,
+        province: body.province,
+        district: body.district || '',
+        shopNote: body.shopNote || '',
+        shopPhone: body.shopPhone || '',
+        latitude: parseFloat(body.latitude),
+        longitude: parseFloat(body.longitude),
+        tripType: body.tripType || '',
+        customerType: body.customerType,
+        visitType: body.visitType || '',
+        result: body.result || '',
+        details: body.details || '',
+        orderAmount: parseAmount(body.orderAmount),
+        userEmail: req.user.email,
+        slipUrl: body.slipUrl || null,
+        slipStatus: body.slipStatus || null,
+        transRef: body.transRef || null,
+        requestId,
+      });
+      visitTrace('request_success', {
+        requestId,
+        durationMs: Date.now() - startedAt,
+        visitId: result?.record?.id,
+      });
+      return result;
+    } catch (err) {
+      visitTrace('request_failed', {
+        requestId,
+        durationMs: Date.now() - startedAt,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      throw err;
+    }
   }
 
   @Post('verify-slip')
