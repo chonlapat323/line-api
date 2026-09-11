@@ -18,6 +18,7 @@ export class CommissionAdjustmentsService {
     type?: string;
     createdBy: string;
   }) {
+    if (!Number.isFinite(data.amount)) throw new BadRequestException('amount must be a number');
     if (data.amount === 0) throw new BadRequestException('amount must not be zero');
     if (data.amount > 50000) throw new BadRequestException('ช่วยยอดได้ไม่เกิน 50,000 บาทต่อครั้ง');
 

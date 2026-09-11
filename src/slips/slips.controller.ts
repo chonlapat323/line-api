@@ -8,16 +8,7 @@ import { SlipsService } from './slips.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-
-// Strips thousands separators (e.g. "14,000") before parsing so a comma
-// doesn't silently truncate the value via parseFloat ("14,000" → 14).
-function parseAmount(raw: unknown): number | null {
-  if (raw == null || raw === '') return null;
-  const cleaned = String(raw).replace(/,/g, '').trim();
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
+import { parseAmount } from '../common/parse-amount.util';
 
 @Controller('slips')
 @UseGuards(JwtAuthGuard)
@@ -202,7 +193,7 @@ export class SlipsController {
     return this.slipsService.approve({
       id,
       action: body.action,
-      amount: body.amount,
+      amount: body.amount != null ? (parseAmount(body.amount) ?? undefined) : undefined,
       adminId: req.user.id,
     });
   }

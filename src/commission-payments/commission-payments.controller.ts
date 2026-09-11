@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CommissionPaymentsService } from './commission-payments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { parseAmount } from '../common/parse-amount.util';
 
 @Controller('commission-payments')
 @UseGuards(JwtAuthGuard)
@@ -35,7 +36,7 @@ export class CommissionPaymentsController {
     return this.service.create({
       userId: body.userId,
       month: body.month,
-      amount: parseFloat(body.amount),
+      amount: parseAmount(body.amount),
       paidBy: req.user.id,
       note: body.note || undefined,
       slipUrl: slipUrl ?? undefined,
