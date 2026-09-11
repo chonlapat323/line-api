@@ -23,6 +23,16 @@ const visitStorage = diskStorage({
   },
 });
 
+// Strips thousands separators (e.g. "14,000") before parsing so a comma
+// doesn't silently truncate the value via parseFloat/Number ("14,000" → 14).
+function parseAmount(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const cleaned = String(raw).replace(/,/g, '').trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 @Controller('visits')
 export class VisitsController {
   private readonly logger = new Logger(VisitsController.name);
@@ -57,7 +67,7 @@ export class VisitsController {
       visitType: body.visitType || '',
       result: body.result || '',
       details: body.details || '',
-      orderAmount: body.orderAmount ? parseFloat(body.orderAmount) : null,
+      orderAmount: parseAmount(body.orderAmount),
       userEmail: req.user.email,
       slipUrl: body.slipUrl || null,
       slipStatus: body.slipStatus || null,
@@ -177,9 +187,7 @@ export class VisitsController {
     return this.visitsService.updateVisit(id, req.user.id, req.user.role, {
       shopName: body.shopName,
       result: body.result,
-      orderAmount: body.orderAmount !== undefined
-        ? (body.orderAmount === null ? null : Number(body.orderAmount))
-        : undefined,
+      orderAmount: body.orderAmount !== undefined ? parseAmount(body.orderAmount) : undefined,
       details: body.details,
     });
   }

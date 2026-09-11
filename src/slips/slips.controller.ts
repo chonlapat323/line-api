@@ -9,6 +9,16 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
+// Strips thousands separators (e.g. "14,000") before parsing so a comma
+// doesn't silently truncate the value via parseFloat ("14,000" → 14).
+function parseAmount(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const cleaned = String(raw).replace(/,/g, '').trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
 @Controller('slips')
 @UseGuards(JwtAuthGuard)
 export class SlipsController {
@@ -35,7 +45,7 @@ export class SlipsController {
     return this.slipsService.submit({
       userId: req.user.id,
       shopName: body.shopName,
-      amount: body.amount ? parseFloat(body.amount) : null,
+      amount: parseAmount(body.amount),
       details: body.details || '',
       slipUrl: body.slipUrl,
       slipStatus: body.slipStatus,
@@ -145,7 +155,7 @@ export class SlipsController {
   ) {
     return this.slipsService.updateSlip(id, {
       shopName: body.shopName,
-      amount: body.amount !== undefined ? (body.amount === '' ? null : parseFloat(body.amount)) : undefined,
+      amount: body.amount !== undefined ? parseAmount(body.amount) : undefined,
       details: body.details,
       slipStatus: body.slipStatus,
       isProxy: body.isProxy !== undefined ? body.isProxy === 'true' : undefined,
@@ -173,7 +183,7 @@ export class SlipsController {
     return this.slipsService.adminCreate({
       userId: body.userId,
       shopName: body.shopName,
-      amount: body.amount ? parseFloat(body.amount) : null,
+      amount: parseAmount(body.amount),
       details: body.details || null,
       slipUrl,
       slipStatus: body.slipStatus || 'approved',
