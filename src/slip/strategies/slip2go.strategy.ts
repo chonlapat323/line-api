@@ -60,7 +60,15 @@ export class Slip2GoStrategy implements ISlipStrategy {
         receiverName: d.receiver?.account?.name,
         receiverBank: d.receiver?.bank?.name,
         receiverBankId: d.receiver?.bank?.id,
-        receiverAccountMasked: d.receiver?.account?.bank?.account ?? d.receiver?.account?.proxy?.account ?? null,
+        // Bill Payment slips (proxy.type "BILLERID") carry a generic bank clearing account in
+        // receiver.account.bank.account that's shared across many different billers on the same
+        // bank's collection system — it does NOT uniquely identify the merchant. The Biller ID
+        // itself is the real, merchant-specific identifier for this kind of slip, so prefer it
+        // over the bank account whenever present. Regular transfers/PromptPay (no BILLERID proxy)
+        // keep the previous bank.account-first behavior.
+        receiverAccountMasked: d.receiver?.account?.proxy?.type === 'BILLERID'
+          ? d.receiver?.account?.proxy?.account
+          : (d.receiver?.account?.bank?.account ?? d.receiver?.account?.proxy?.account ?? null),
         paidAt: d.dateTime,
         raw: d,
       };
