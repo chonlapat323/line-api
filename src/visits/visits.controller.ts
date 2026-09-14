@@ -142,8 +142,11 @@ export class VisitsController {
       slipUrl = `${appUrl}/uploads/line/${filename}`;
     }
 
-    // 5. Store hash now (before QR check) so ALL slip images are tracked regardless of QR result
-    await this.prisma.slipHash.create({ data: { hash, userId } }).catch(() => {});
+    // 5. NOTE: the hash is intentionally NOT written here. Verifying a slip doesn't mean the
+    // user goes on to actually submit it (they might cancel, the app might crash, the final
+    // POST might drop) — writing the hash at verify-time would permanently "burn" a legitimate,
+    // never-actually-used slip. We only check for duplicates here; slips.service.ts writes the
+    // hash once the submission is actually saved, linked to that SlipSubmission via slipSubmissionId.
 
     // 6. QR-readable: check receiver + enforce rules
     if (result.success && result.receiverBankId && result.receiverAccountMasked) {
@@ -151,7 +154,7 @@ export class VisitsController {
       // bankId "000" = PromptPay/proxy — Slip2Go cannot identify the bank, skip receiver check
       if (result.receiverBankId === '000') {
         this.logger.log(`[verify-slip] receiver bankId=000 (PromptPay) → skip account check`);
-        return { ...result, slipUrl, receiverMatch: true };
+        return { ...result, slipUrl, hash, receiverMatch: true };
       }
 
       // Check receiver against allowed accounts
@@ -173,11 +176,11 @@ export class VisitsController {
         return { success: false, blocked: true, blockedUntil: blockedUntil.toISOString() };
       }
 
-      return { ...result, slipUrl, receiverMatch: true };
+      return { ...result, slipUrl, hash, receiverMatch: true };
     }
 
     // 7. QR not readable → pending_approval
-    return { ...result, slipUrl };
+    return { ...result, slipUrl, hash };
   }
 
   @Patch(':id/approve')

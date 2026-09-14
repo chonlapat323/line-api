@@ -30,6 +30,7 @@ export class SlipsController {
       isReceiverBlocked?: boolean;
       receiverBankId?: string;
       receiverAccountMasked?: string;
+      hash?: string;
     },
     @Request() req,
   ) {
@@ -47,6 +48,7 @@ export class SlipsController {
       isReceiverBlocked: body.isReceiverBlocked ?? false,
       receiverBankId: body.receiverBankId || null,
       receiverAccountMasked: body.receiverAccountMasked || null,
+      hash: body.hash || undefined,
     });
   }
 

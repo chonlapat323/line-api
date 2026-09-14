@@ -70,6 +70,7 @@ export class SlipsService {
     isReceiverBlocked?: boolean;
     receiverBankId?: string;
     receiverAccountMasked?: string;
+    hash?: string;
   }) {
     const submission = await this.prisma.slipSubmission.create({
       data: {
@@ -88,6 +89,17 @@ export class SlipsService {
         receiverAccountMasked: params.receiverAccountMasked ?? null,
       },
     });
+
+    // Only now — with a real, saved submission — do we "burn" this slip image against reuse.
+    // (verify-slip only checks for an existing hash; it never writes one, so an abandoned
+    // verify-without-submit never permanently blocks a legitimate slip.)
+    if (params.hash) {
+      await this.prisma.slipHash.create({
+        data: { hash: params.hash, userId: params.userId, slipSubmissionId: submission.id },
+      }).catch((e) => {
+        this.logger.warn(`[submit] slipHash link failed (hash=${params.hash?.slice(0, 16)}…): ${e.message}`);
+      });
+    }
 
     if (params.amount && !params.isReceiverBlocked) {
       await this.sendToLine(submission.id, params.userId, params.slipUrl, params.shopName, params.amount, params.details, params.slipStatus, params.isProxy);

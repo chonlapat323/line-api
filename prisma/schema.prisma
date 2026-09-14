@@ -134,6 +134,7 @@ model SlipSubmission {
 
   user     User  @relation("SlipSubmissions", fields: [userId], references: [id])
   approver User? @relation("SlipApprovals", fields: [approvedBy], references: [id])
+  slipHash SlipHash?
 }
 
 model AllowedBankAccount {
@@ -236,10 +237,13 @@ model ShopContact {
 }
 
 model SlipHash {
-  id        String   @id @default(cuid())
-  hash      String   @unique
-  userId    String
-  createdAt DateTime @default(now())
+  id               String   @id @default(cuid())
+  hash             String   @unique
+  userId           String
+  slipSubmissionId String?  @unique
+  createdAt        DateTime @default(now())
+
+  slipSubmission SlipSubmission? @relation(fields: [slipSubmissionId], references: [id])
 }
 
 model SlipVerifyBlock {
