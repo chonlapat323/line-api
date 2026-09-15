@@ -111,14 +111,7 @@ export class VisitsController {
     const userId: string = req.user.id;
     this.logger.log(`[verify-slip] received: file=${file.originalname} size=${file.size}B (${Math.round(file.size/1024)}KB) mime=${file.mimetype} userId=${userId}`);
 
-    // 1. Check if user is currently blocked
-    const block = await this.prisma.slipVerifyBlock.findUnique({ where: { userId } });
-    if (block && block.blockedUntil > new Date()) {
-      this.logger.warn(`[verify-slip] user ${userId} is blocked until ${block.blockedUntil.toISOString()}`);
-      return { success: false, blocked: true, blockedUntil: block.blockedUntil.toISOString() };
-    }
-
-    // 2. Check if this slip image was already used (SHA256 of raw buffer)
+    // 1. Check if this slip image was already used (SHA256 of raw buffer)
     const hash = crypto.createHash('sha256').update(file.buffer).digest('hex');
     const existing = await this.prisma.slipHash.findUnique({ where: { hash } });
     if (existing) {
@@ -127,11 +120,11 @@ export class VisitsController {
       return { success: false, duplicate: true };
     }
 
-    // 3. Call Slip2Go
+    // 2. Call Slip2Go
     const result = await this.slipService.verify(file.buffer, file.originalname);
     this.logger.log(`verify-slip result: success=${result.success} transRef=${result.transRef ?? '-'} amount=${result.amount ?? '-'}`);
 
-    // 4. Save file to disk (always, for audit)
+    // 3. Save file to disk (always, for audit)
     let slipUrl: string | null = null;
     if (file?.buffer) {
       const dir = path.join(process.cwd(), 'uploads', 'line');
@@ -142,19 +135,28 @@ export class VisitsController {
       slipUrl = `${appUrl}/uploads/line/${filename}`;
     }
 
-    // 5. NOTE: the hash is intentionally NOT written here. Verifying a slip doesn't mean the
+    // 4. NOTE: the hash is intentionally NOT written here. Verifying a slip doesn't mean the
     // user goes on to actually submit it (they might cancel, the app might crash, the final
     // POST might drop) — writing the hash at verify-time would permanently "burn" a legitimate,
     // never-actually-used slip. We only check for duplicates here; slips.service.ts writes the
     // hash once the submission is actually saved, linked to that SlipSubmission via slipSubmissionId.
 
-    // 6. QR-readable: check receiver + enforce rules
+    // 5. QR-readable: check receiver + enforce rules
     if (result.success && result.receiverBankId && result.receiverAccountMasked) {
 
       // bankId "000" = PromptPay/proxy — Slip2Go cannot identify the bank, skip receiver check
       if (result.receiverBankId === '000') {
         this.logger.log(`[verify-slip] receiver bankId=000 (PromptPay) → skip account check`);
         return { ...result, slipUrl, hash, receiverMatch: true };
+      }
+
+      // Only slips that actually go through receiver-account verification are subject to the
+      // cool-down block — a slip with no readable QR (handled below) never reaches this branch,
+      // so it's never affected by an earlier mismatch's block window.
+      const block = await this.prisma.slipVerifyBlock.findUnique({ where: { userId } });
+      if (block && block.blockedUntil > new Date()) {
+        this.logger.warn(`[verify-slip] user ${userId} is blocked until ${block.blockedUntil.toISOString()}`);
+        return { success: false, blocked: true, blockedUntil: block.blockedUntil.toISOString() };
       }
 
       // Check receiver against allowed accounts
@@ -179,7 +181,7 @@ export class VisitsController {
       return { ...result, slipUrl, hash, receiverMatch: true };
     }
 
-    // 7. QR not readable → pending_approval
+    // 6. QR not readable → pending_approval (no receiver check, so never subject to the block above)
     return { ...result, slipUrl, hash };
   }
 
