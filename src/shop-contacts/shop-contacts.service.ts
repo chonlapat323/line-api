@@ -28,6 +28,44 @@ export class ShopContactsService {
     return { synced: upserted };
   }
 
+  // Called when a visit is saved with a shop name that isn't an exact match to an existing
+  // ShopContact. Creates it in FlowAccount too, so the real accounting system and our
+  // autocomplete list stay in sync. Never throws — a FlowAccount hiccup here must not
+  // block the visit that's already been saved.
+  async ensureContactExists(shopName: string): Promise<void> {
+    const name = shopName?.trim();
+    if (!name) return;
+
+    try {
+      const existing = await this.prisma.shopContact.findFirst({
+        where: { contactName: { equals: name, mode: 'insensitive' } },
+      });
+      if (existing) return;
+
+      const created = await this.flowAccount.createContact(name);
+      await this.prisma.shopContact.upsert({
+        where: { flowAccountContactId: created.contactId },
+        update: { contactName: created.contactName },
+        create: { flowAccountContactId: created.contactId, contactName: created.contactName },
+      });
+      this.logger.log(`[ensureContactExists] created new FlowAccount contact "${name}" (id=${created.contactId})`);
+    } catch (err) {
+      this.logger.warn(`[ensureContactExists] failed for "${name}": ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  // Exact (case-insensitive) match check — used by mobile before showing the
+  // "this is a new shop, add it?" confirm popup.
+  async exists(name: string): Promise<boolean> {
+    const q = name?.trim();
+    if (!q) return false;
+    const found = await this.prisma.shopContact.findFirst({
+      where: { contactName: { equals: q, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return !!found;
+  }
+
   async search(query: string) {
     const q = query.trim();
     if (!q) return [];

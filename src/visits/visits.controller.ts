@@ -79,6 +79,7 @@ export class VisitsController {
         slipUrl: body.slipUrl || null,
         slipStatus: body.slipStatus || null,
         transRef: body.transRef || null,
+        confirmNewShop: body.confirmNewShop === true || body.confirmNewShop === 'true',
         requestId,
       });
       visitTrace('request_success', {

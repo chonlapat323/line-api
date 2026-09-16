@@ -7,5 +7,6 @@ import { FlowAccountModule } from '../flowaccount/flowaccount.module';
   imports: [FlowAccountModule],
   controllers: [ShopContactsController],
   providers: [ShopContactsService],
+  exports: [ShopContactsService],
 })
 export class ShopContactsModule {}

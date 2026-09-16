@@ -104,4 +104,31 @@ export class FlowAccountService {
     }
     return all;
   }
+
+  // contactGroup 3 = นิติบุคคล, contactType 3 = ลูกค้า — the defaults FlowAccount itself documents.
+  async createContact(contactName: string): Promise<FlowAccountContact> {
+    const token = await this.getToken();
+    const res = await fetch(`${this.baseUrl}/contacts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ contactName, contactGroup: 3, contactType: 3 }),
+    });
+
+    const rawBody = await res.text();
+    if (!res.ok) {
+      throw new Error(`FlowAccount create contact error: ${res.status} ${rawBody}`);
+    }
+
+    const data = JSON.parse(rawBody);
+    const created = Array.isArray(data.data?.list) ? data.data.list[0] : data.data ?? data;
+    const contactId = created?.id ?? created?.contactId;
+    if (contactId == null) {
+      throw new Error(`FlowAccount create contact: unrecognized response shape: ${rawBody.slice(0, 500)}`);
+    }
+
+    return { contactId, contactName: created.contactName ?? contactName };
+  }
 }

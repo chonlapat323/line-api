@@ -5,6 +5,7 @@ import { LineService } from '../line/line.service';
 import { GoogleService } from '../google/google.service';
 import { calculateCommission, classifyVisits } from './commission.utils';
 import { visitTrace } from '../common/visit-trace.util';
+import { ShopContactsService } from '../shop-contacts/shop-contacts.service';
 
 @Injectable()
 export class VisitsService {
@@ -14,6 +15,7 @@ export class VisitsService {
     private prisma: PrismaService,
     private lineService: LineService,
     private googleService: GoogleService,
+    private shopContactsService: ShopContactsService,
   ) {}
 
   async create(params: {
@@ -36,6 +38,7 @@ export class VisitsService {
     slipUrl?: string | null;
     slipStatus?: string | null;
     transRef?: string | null;
+    confirmNewShop?: boolean;
     requestId?: string;
   }) {
     const requestId = params.requestId;
@@ -67,6 +70,13 @@ export class VisitsService {
       },
     });
     visitTrace('db_insert_done', { requestId, durationMs: Date.now() - t, visitId: record.id });
+
+    if (params.confirmNewShop) {
+      t = Date.now();
+      visitTrace('flowaccount_ensure_contact_start', { requestId });
+      await this.shopContactsService.ensureContactExists(params.shopName);
+      visitTrace('flowaccount_ensure_contact_done', { requestId, durationMs: Date.now() - t });
+    }
 
     const tripMap: Record<string, string> = {
       plan: 'ตามแผน', off_plan: 'นอกแผน',

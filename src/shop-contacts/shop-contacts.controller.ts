@@ -15,6 +15,13 @@ export class ShopContactsController {
     return this.shopContactsService.search(q || '');
   }
 
+  // Exact-match check — mobile calls this before showing the "new shop, add it?" popup.
+  @Get('exists')
+  @UseGuards(JwtAuthGuard)
+  async exists(@Query('name') name: string) {
+    return { exists: await this.shopContactsService.exists(name || '') };
+  }
+
   // Admin-only: pull the latest contact list from FlowAccount.
   @Post('sync')
   @UseGuards(JwtAuthGuard, RolesGuard)
