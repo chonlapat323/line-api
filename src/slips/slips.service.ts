@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LineService } from '../line/line.service';
 import { CommissionAdjustmentsService } from '../commission-adjustments/commission-adjustments.service';
 import { SettingsService } from '../settings/settings.service';
+import { ShopContactsService } from '../shop-contacts/shop-contacts.service';
 
 function getCurrentMonth(): string {
   const now = new Date();
@@ -18,6 +19,7 @@ export class SlipsService {
     private lineService: LineService,
     private commissionAdjustments: CommissionAdjustmentsService,
     private settings: SettingsService,
+    private shopContactsService: ShopContactsService,
   ) {}
 
   async applyDebtDeduction(slipId: string, userId: string, slipAmount: number, adminId: string): Promise<number> {
@@ -71,6 +73,7 @@ export class SlipsService {
     receiverBankId?: string;
     receiverAccountMasked?: string;
     hash?: string;
+    confirmNewShop?: boolean;
   }) {
     const submission = await this.prisma.slipSubmission.create({
       data: {
@@ -99,6 +102,10 @@ export class SlipsService {
       }).catch((e) => {
         this.logger.warn(`[submit] slipHash link failed (hash=${params.hash?.slice(0, 16)}…): ${e.message}`);
       });
+    }
+
+    if (params.confirmNewShop) {
+      await this.shopContactsService.ensureContactExists(params.shopName);
     }
 
     if (params.amount && !params.isReceiverBlocked) {

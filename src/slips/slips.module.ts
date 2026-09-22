@@ -5,9 +5,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { LineModule } from '../line/line.module';
 import { CommissionAdjustmentsModule } from '../commission-adjustments/commission-adjustments.module';
 import { SettingsModule } from '../settings/settings.module';
+import { ShopContactsModule } from '../shop-contacts/shop-contacts.module';
 
 @Module({
-  imports: [PrismaModule, LineModule, CommissionAdjustmentsModule, SettingsModule],
+  imports: [PrismaModule, LineModule, CommissionAdjustmentsModule, SettingsModule, ShopContactsModule],
   controllers: [SlipsController],
   providers: [SlipsService],
 })

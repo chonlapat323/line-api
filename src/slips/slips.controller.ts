@@ -31,6 +31,7 @@ export class SlipsController {
       receiverBankId?: string;
       receiverAccountMasked?: string;
       hash?: string;
+      confirmNewShop?: boolean;
     },
     @Request() req,
   ) {
@@ -49,6 +50,7 @@ export class SlipsController {
       receiverBankId: body.receiverBankId || null,
       receiverAccountMasked: body.receiverAccountMasked || null,
       hash: body.hash || undefined,
+      confirmNewShop: body.confirmNewShop === true,
     });
   }
 
