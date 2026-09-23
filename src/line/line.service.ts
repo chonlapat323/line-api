@@ -403,6 +403,13 @@ export class LineService {
     return spans;
   }
 
+  // Splits a block's inner HTML on <br> tags — editors emit these for soft line breaks
+  // inside a single <p>/<li>, and parseInlineSpans doesn't understand the <br> tag itself
+  // (it only knows strong/b/em/i/u), so left unsplit it leaks through as literal "br>" text.
+  private splitOnBr(html: string): string[] {
+    return html.split(/<br\s*\/?>/g);
+  }
+
   // Converts editor HTML (paragraphs, bullet/numbered lists, bold/italic/underline) into Flex body contents.
   private htmlToFlexContents(html: string): any[] {
     const contents: any[] = [];
@@ -413,29 +420,39 @@ export class LineService {
       matched = true;
       if (m[1] !== undefined) {
         const inner = m[1].trim();
-        contents.push(
-          inner
-            ? { type: 'text', wrap: true, size: 'sm', contents: this.parseInlineSpans(inner) }
-            : { type: 'text', text: ' ', size: 'xs' },
-        );
+        if (!inner) {
+          contents.push({ type: 'text', text: ' ', size: 'xs' });
+        } else {
+          for (const line of this.splitOnBr(inner)) {
+            contents.push({ type: 'text', wrap: true, size: 'sm', contents: this.parseInlineSpans(line.trim()) });
+          }
+        }
       } else if (m[2] !== undefined) {
         const liRe = /<li>([\s\S]*?)<\/li>/g;
         let lm: RegExpExecArray | null;
         while ((lm = liRe.exec(m[2]))) {
+          const lines = this.splitOnBr(lm[1].trim());
           contents.push({
             type: 'text', wrap: true, size: 'sm',
-            contents: [{ type: 'span', text: '•  ' }, ...this.parseInlineSpans(lm[1].trim())],
+            contents: [{ type: 'span', text: '•  ' }, ...this.parseInlineSpans(lines[0])],
           });
+          for (const extra of lines.slice(1)) {
+            contents.push({ type: 'text', wrap: true, size: 'sm', contents: this.parseInlineSpans(extra.trim()) });
+          }
         }
       } else if (m[3] !== undefined) {
         const liRe = /<li>([\s\S]*?)<\/li>/g;
         let lm: RegExpExecArray | null;
         let idx = 1;
         while ((lm = liRe.exec(m[3]))) {
+          const lines = this.splitOnBr(lm[1].trim());
           contents.push({
             type: 'text', wrap: true, size: 'sm',
-            contents: [{ type: 'span', text: `${idx}.  ` }, ...this.parseInlineSpans(lm[1].trim())],
+            contents: [{ type: 'span', text: `${idx}.  ` }, ...this.parseInlineSpans(lines[0])],
           });
+          for (const extra of lines.slice(1)) {
+            contents.push({ type: 'text', wrap: true, size: 'sm', contents: this.parseInlineSpans(extra.trim()) });
+          }
           idx++;
         }
       }
