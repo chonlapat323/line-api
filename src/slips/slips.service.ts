@@ -368,7 +368,7 @@ export class SlipsService {
       if (params.dateTo) where.createdAt.lte = new Date(params.dateTo + "T23:59:59");
     }
 
-    const [data, total] = await Promise.all([
+    const [data, total, totalAgg] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -377,9 +377,14 @@ export class SlipsService {
         include: { user: { select: { fullName: true, email: true } } },
       }),
       this.prisma.slipSubmission.count({ where }),
+      // ยอดรวมของทุกรายการที่ตรง filter (ไม่ใช่แค่หน้าปัจจุบัน) — ไม่รวมสลิปที่ถูกปฏิเสธ เว้นแต่กรองดูสถานะปฏิเสธ
+      this.prisma.slipSubmission.aggregate({
+        where: params.status ? where : { ...where, slipStatus: { not: 'rejected' } },
+        _sum: { amount: true },
+      }),
     ]);
 
-    return { data, total, page, totalPages: Math.ceil(total / limit) };
+    return { data, total, totalAmount: totalAgg._sum.amount ?? 0, page, totalPages: Math.ceil(total / limit) };
   }
 
   async approve(params: {
