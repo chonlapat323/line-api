@@ -1,7 +1,7 @@
 import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
-import { FlowAccountService } from './flowaccount.service';
+import { FlowAccountService, SalesDoc } from './flowaccount.service';
 
 type SalesOverview = {
   from: string;
@@ -13,6 +13,7 @@ type SalesOverview = {
   cashCount: number;
   slipTotal: number;       // ยอดที่เซลล์เก็บ = สลิปที่ยืนยัน QR / อนุมัติแล้ว
   slipCount: number;
+  documents: SalesDoc[];   // ทุกใบที่ดึงมา (รวมใบที่ไม่นับ) ไว้ตรวจสอบ
 };
 
 const CACHE_MS = 10 * 60 * 1000;            // ช่วงที่รวมวันนี้ — เอกสารยังเพิ่มได้
@@ -61,6 +62,7 @@ export class FlowAccountController {
       cashTotal: cash.total, cashCount: cash.count,
       slipTotal: slipAgg._sum.amount ?? 0,
       slipCount: slipAgg._count,
+      documents: [...invoice.docs, ...cash.docs].sort((a, b) => a.serial.localeCompare(b.serial)),
     };
     this.cache.set(key, { at: Date.now(), value });
     return value;

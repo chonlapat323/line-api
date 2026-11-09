@@ -10,6 +10,17 @@ export type FlowAccountContact = {
   contactName: string;
 };
 
+// เอกสารขาย 1 ใบ สำหรับแสดงรายการตรวจสอบ
+export type SalesDoc = {
+  type: 'invoice' | 'cash';
+  serial: string;        // เลขที่เอกสาร เช่น INV2026110001
+  contactName: string;
+  date: string;          // วันที่เอกสาร YYYY-MM-DD
+  status: string;        // statusString จาก FlowAccount
+  grandTotal: number;
+  counted: boolean;      // นับเข้ายอดซื้อหรือไม่
+};
+
 @Injectable()
 export class FlowAccountService {
   private readonly logger = new Logger(FlowAccountService.name);
@@ -95,11 +106,12 @@ export class FlowAccountService {
   // ผลรวม "ยอดรวมสุทธิ" (grandTotal) ของเอกสารในช่วงวันที่เอกสาร ไม่นับใบที่ยกเลิก (void)
   // path: '/tax-invoices' = ใบส่งของ/ใบแจ้งหนี้ (เลข INV...), '/cash-invoices' = ขายเงินสด
   // onlyStatus: นับเฉพาะสถานะนี้ (เช่น 'awaiting' = รอดำเนินการ)
-  async sumDocuments(path: '/tax-invoices' | '/cash-invoices', startDate: string, endDate: string, onlyStatus?: string): Promise<{ total: number; count: number }> {
+  async sumDocuments(path: '/tax-invoices' | '/cash-invoices', startDate: string, endDate: string, onlyStatus?: string): Promise<{ total: number; count: number; docs: SalesDoc[] }> {
     const token = await this.getToken();
     const pageSize = 100;
     let total = 0;
     let count = 0;
+    const docs: SalesDoc[] = [];
     for (let page = 1; page <= 100; page++) {
       const url = `${this.baseUrl}${path}?currentPage=${page}&pageSize=${pageSize}&range=5&startDate=${startDate}&endDate=${endDate}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -119,9 +131,19 @@ export class FlowAccountService {
 
       for (const doc of items) {
         const status = String(doc.statusString ?? '').toLowerCase();
-        if (status === 'void') continue;
-        if (onlyStatus && status !== onlyStatus) continue;
-        total += Number(doc.grandTotal ?? 0) || 0;
+        const amount = Number(doc.grandTotal ?? 0) || 0;
+        const counted = status !== 'void' && (!onlyStatus || status === onlyStatus);
+        docs.push({
+          type: path === '/tax-invoices' ? 'invoice' : 'cash',
+          serial: String(doc.documentSerial ?? ''),
+          contactName: String(doc.contactName ?? ''),
+          date: String(doc.publishedOn ?? '').slice(0, 10),
+          status,
+          grandTotal: amount,
+          counted,
+        });
+        if (!counted) continue;
+        total += amount;
         count++;
       }
 
@@ -129,7 +151,7 @@ export class FlowAccountService {
       const hasMore = listTotal != null ? page * pageSize < listTotal : items.length === pageSize;
       if (!hasMore) break;
     }
-    return { total: Math.round(total * 100) / 100, count };
+    return { total: Math.round(total * 100) / 100, count, docs };
   }
 
   // Pages through the entire contact list. Safety cap avoids an infinite loop if FlowAccount's
