@@ -62,7 +62,8 @@ export class FlowAccountController {
       cashTotal: cash.total, cashCount: cash.count,
       slipTotal: slipAgg._sum.amount ?? 0,
       slipCount: slipAgg._count,
-      documents: [...invoice.docs, ...cash.docs].sort((a, b) => a.serial.localeCompare(b.serial)),
+      // เรียงตามวันที่เอกสาร ใหม่ → เก่า (เหมือนหน้า FlowAccount) วันเดียวกันเรียงตามเลขที่เอกสาร
+      documents: [...invoice.docs, ...cash.docs].sort((a, b) => b.date.localeCompare(a.date) || b.serial.localeCompare(a.serial)),
     };
     this.cache.set(key, { at: Date.now(), value });
     return value;
