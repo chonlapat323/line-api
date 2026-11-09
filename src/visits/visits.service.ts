@@ -3,7 +3,7 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineService } from '../line/line.service';
 import { GoogleService } from '../google/google.service';
-import { calculateCommission, classifyVisits } from './commission.utils';
+import { calculateCommission, calcCommissionBase, classifyVisits } from './commission.utils';
 import { visitTrace } from '../common/visit-trace.util';
 import { ShopContactsService } from '../shop-contacts/shop-contacts.service';
 
@@ -300,7 +300,7 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [slips, settings, prevPosAdjRows, allNegAdjRows, adjThisMonthRows, adjCarryoverRows] = await Promise.all([
+    const [slips, settings, prevPosAdjRows, allNegAdjRows, adjThisMonthRows] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where: {
           slipStatus: { in: ['verified', 'approved', 'pending_approval'] },
@@ -336,12 +336,6 @@ export class VisitsService {
         where: { month, amount: { gt: 0 }, type: 'loan_help' },
         _sum: { amount: true },
       }),
-      // ยอดเติมยกมา NET: loan_help + repayment เดือนก่อนๆ (netted against past repayments)
-      this.prisma.commissionAdjustment.groupBy({
-        by: ['userId'],
-        where: { month: { lt: month }, type: { in: ['loan_help', 'repayment'] } },
-        _sum: { amount: true },
-      }),
     ]);
 
     const settingMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
@@ -365,9 +359,6 @@ export class VisitsService {
     const adjThisMonthMap = new Map<string, number>();
     for (const a of adjThisMonthRows) adjThisMonthMap.set(a.userId, a._sum.amount ?? 0);
 
-    // ยอดเติมยกมาต่อ user
-    const adjCarryoverMap = new Map<string, number>();
-    for (const a of adjCarryoverRows) adjCarryoverMap.set(a.userId, a._sum.amount ?? 0);
 
     const userMap = new Map<string, { user: any; count: number; slipAmount: number; totalDeducted: number; pendingCount: number; proxySlipAmount: number }>();
     for (const slip of slips) {
@@ -390,7 +381,7 @@ export class VisitsService {
     // ดึง user info สำหรับ users ที่มี adjustment แต่ไม่มี slip เดือนนี้
     const missingUserIds = [...new Set([
       ...Array.from(adjThisMonthMap.keys()),
-      ...Array.from(adjCarryoverMap.keys()),
+      ...Array.from(debtMap.keys()),
     ])].filter((uid) => !userMap.has(uid));
 
     if (missingUserIds.length > 0) {
@@ -406,8 +397,10 @@ export class VisitsService {
     const summary = Array.from(userMap.entries())
       .map(([uid, { user, count, slipAmount, totalDeducted, pendingCount, proxySlipAmount }]) => {
         const adjustThisMonth = adjThisMonthMap.get(uid) ?? 0;
-        const adjustCarryover = adjCarryoverMap.get(uid) ?? 0;
-        const regularBase = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
+        // ยอดช่วย = เงินยืม: บวกเฉพาะเดือนที่ได้ช่วย แล้วหักคืนผ่าน debtDeducted ของสลิปเดือนถัดๆ ไป
+        // (ไม่บวก "ยอดช่วยยกมา" อีก — เดิมบวกกลับทำให้ยอดหักคืนถูกหักล้างจนไม่เคยคืนจริง)
+        const adjustCarryover = 0;
+        const regularBase = calcCommissionBase({ slipAmount, debtDeducted: totalDeducted, helpThisMonth: adjustThisMonth });
         // threshold เช็คจากยอดรวมทั้ง regular + proxy
         const totalForThreshold = regularBase + proxySlipAmount;
         const reachedThreshold = threshold === 0 || totalForThreshold >= threshold;
@@ -492,7 +485,7 @@ export class VisitsService {
     const dateFrom = new Date(year, monthNum - 1, 1);
     const dateTo = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
-    const [slips, settings, adjThisMonth, adjCarryover, prevPosResult, allNegResult] = await Promise.all([
+    const [slips, settings, adjThisMonth, prevPosResult, allNegResult] = await Promise.all([
       this.prisma.slipSubmission.findMany({
         where: {
           userId,
@@ -507,11 +500,6 @@ export class VisitsService {
       // ยอดเติมเดือนนี้ loan_help เท่านั้น (บวกเข้า commission formula)
       this.prisma.commissionAdjustment.aggregate({
         where: { userId, month, amount: { gt: 0 }, type: 'loan_help' },
-        _sum: { amount: true },
-      }),
-      // ยอดเติมยกมา NET: loan_help + repayment เดือนก่อนๆ (netted against past repayments)
-      this.prisma.commissionAdjustment.aggregate({
-        where: { userId, month: { lt: month }, type: { in: ['loan_help', 'repayment'] } },
         _sum: { amount: true },
       }),
       // ยอดที่ต้องหักคืน (positive ทุก type, month < current)
@@ -546,10 +534,10 @@ export class VisitsService {
     const pendingAmount    = pendingSlips.reduce((s, v) => s + (v.amount ?? 0), 0);
 
     const adjustThisMonth = adjThisMonth._sum.amount ?? 0;
-    const adjustCarryover = adjCarryover._sum.amount ?? 0;
+    const adjustCarryover = 0; // ไม่บวกยอดช่วยยกมา — ดูเหตุผลใน getCommissionSummary
 
     // ยอดคำนวณค่าคอมปกติ (ไม่รวม proxy)
-    const totalAmount = slipAmount - totalDeducted + adjustCarryover + adjustThisMonth;
+    const totalAmount = calcCommissionBase({ slipAmount, debtDeducted: totalDeducted, helpThisMonth: adjustThisMonth });
 
     // ยอดค้างจากเดือนก่อน
     const outstandingDebt = Math.max(0, (prevPosResult._sum.amount ?? 0) + (allNegResult._sum.amount ?? 0));

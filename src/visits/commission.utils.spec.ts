@@ -1,4 +1,4 @@
-import { calculateCommission, classifyVisits } from './commission.utils';
+import { calculateCommission, calcCommissionBase, classifyVisits } from './commission.utils';
 
 // ─────────────────────────────────────────────
 // calculateCommission
@@ -176,5 +176,27 @@ describe('classifyVisits', () => {
       expect(reachedThreshold).toBe(false);
       expect(commission).toBe(0);
     });
+  });
+});
+
+// ─────────────────────────────────────────────
+// calcCommissionBase — ยอดช่วย = เงินยืม ต้องหักคืน
+// ─────────────────────────────────────────────
+describe('calcCommissionBase (ยอดช่วยเป็นเงินยืม)', () => {
+  it('เดือนที่ได้ช่วย: ยอดสลิป + ยอดช่วย', () => {
+    expect(calcCommissionBase({ slipAmount: 10000, debtDeducted: 0, helpThisMonth: 5000 })).toBe(15000);
+  });
+
+  it('เดือนที่หักคืน: ยอดสลิป − ยอดหักคืน (ไม่บวกยอดช่วยยกมากลับ)', () => {
+    // ก.ย. ช่วย 5,000 → ต.ค. สลิป 20,000 ถูกหักคืน 5,000 → ต้องเหลือ 15,000
+    expect(calcCommissionBase({ slipAmount: 20000, debtDeducted: 5000, helpThisMonth: 0 })).toBe(15000);
+  });
+
+  it('เดือนที่ยังไม่มีสลิปมาหักคืน: ไม่ได้ยอดช่วยซ้ำ', () => {
+    expect(calcCommissionBase({ slipAmount: 0, debtDeducted: 0, helpThisMonth: 0 })).toBe(0);
+  });
+
+  it('คืนครบแล้ว: ยอดสลิปปกติ', () => {
+    expect(calcCommissionBase({ slipAmount: 8000, debtDeducted: 0, helpThisMonth: 0 })).toBe(8000);
   });
 });

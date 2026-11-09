@@ -26,6 +26,14 @@ export interface CommissionResult {
   breakdown?: TierBreakdown[];
 }
 
+// ยอดคำนวณค่าคอมปกติของเดือน — ยอดช่วย (loan_help) เป็นเงินยืม:
+// บวกเฉพาะเดือนที่ได้ช่วย แล้วหักคืนผ่าน debtDeducted ของสลิปเดือนถัดๆ ไป จนกว่าจะคืนครบ
+export function calcCommissionBase({ slipAmount, debtDeducted, helpThisMonth }: {
+  slipAmount: number; debtDeducted: number; helpThisMonth: number;
+}): number {
+  return slipAmount - debtDeducted + helpThisMonth;
+}
+
 export function calculateCommission({ totalAmount, rate, threshold, tiers }: CommissionInput): CommissionResult {
   const reachedThreshold = threshold === 0 || totalAmount >= threshold;
   if (!reachedThreshold) {
