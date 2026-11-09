@@ -94,7 +94,8 @@ export class FlowAccountService {
   // ── ยอดขายจากเอกสารขาย ──────────────────────────────────────────────
   // ผลรวม "ยอดรวมสุทธิ" (grandTotal) ของเอกสารในช่วงวันที่เอกสาร ไม่นับใบที่ยกเลิก (void)
   // path: '/tax-invoices' = ใบส่งของ/ใบแจ้งหนี้ (เลข INV...), '/cash-invoices' = ขายเงินสด
-  async sumDocuments(path: '/tax-invoices' | '/cash-invoices', startDate: string, endDate: string): Promise<{ total: number; count: number }> {
+  // onlyStatus: นับเฉพาะสถานะนี้ (เช่น 'awaiting' = รอดำเนินการ)
+  async sumDocuments(path: '/tax-invoices' | '/cash-invoices', startDate: string, endDate: string, onlyStatus?: string): Promise<{ total: number; count: number }> {
     const token = await this.getToken();
     const pageSize = 100;
     let total = 0;
@@ -117,7 +118,9 @@ export class FlowAccountService {
       }
 
       for (const doc of items) {
-        if (String(doc.statusString ?? '').toLowerCase() === 'void') continue;
+        const status = String(doc.statusString ?? '').toLowerCase();
+        if (status === 'void') continue;
+        if (onlyStatus && status !== onlyStatus) continue;
         total += Number(doc.grandTotal ?? 0) || 0;
         count++;
       }

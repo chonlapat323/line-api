@@ -6,7 +6,7 @@ import { FlowAccountService } from './flowaccount.service';
 type SalesOverview = {
   from: string;
   to: string;
-  salesTotal: number;      // ยอดซื้อจากลูกค้า = ใบส่งของ/ใบแจ้งหนี้ + ขายเงินสด (FlowAccount)
+  salesTotal: number;      // ยอดซื้อจากลูกค้า = ใบส่งของ/ใบแจ้งหนี้ (สถานะรอดำเนินการ) + ขายเงินสด (FlowAccount)
   invoiceTotal: number;
   invoiceCount: number;
   cashTotal: number;
@@ -42,7 +42,7 @@ export class FlowAccountController {
     if (hit && Date.now() - hit.at < ttl) return hit.value;
 
     const [invoice, cash, slipAgg] = await Promise.all([
-      this.flowAccount.sumDocuments('/tax-invoices', from, to),
+      this.flowAccount.sumDocuments('/tax-invoices', from, to, 'awaiting'), // ใบส่งของ: เฉพาะ รอดำเนินการ
       this.flowAccount.sumDocuments('/cash-invoices', from, to),
       this.prisma.slipSubmission.aggregate({
         where: {
