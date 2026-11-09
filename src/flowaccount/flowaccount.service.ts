@@ -91,6 +91,44 @@ export class FlowAccountService {
     return { contacts, hasMore, total };
   }
 
+  // ── ยอดขายจากเอกสารขาย ──────────────────────────────────────────────
+  // ผลรวม "ยอดรวมสุทธิ" (grandTotal) ของเอกสารในช่วงวันที่เอกสาร ไม่นับใบที่ยกเลิก (void)
+  // path: '/tax-invoices' = ใบส่งของ/ใบแจ้งหนี้ (เลข INV...), '/cash-invoices' = ขายเงินสด
+  async sumDocuments(path: '/tax-invoices' | '/cash-invoices', startDate: string, endDate: string): Promise<{ total: number; count: number }> {
+    const token = await this.getToken();
+    const pageSize = 100;
+    let total = 0;
+    let count = 0;
+    for (let page = 1; page <= 100; page++) {
+      const url = `${this.baseUrl}${path}?currentPage=${page}&pageSize=${pageSize}&range=5&startDate=${startDate}&endDate=${endDate}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const rawBody = await res.text();
+      if (!res.ok) throw new Error(`FlowAccount ${path} error: ${res.status} ${rawBody.slice(0, 500)}`);
+
+      const data = JSON.parse(rawBody);
+      const items: any[] | null =
+        Array.isArray(data.data?.list) ? data.data.list
+        : Array.isArray(data.data) ? data.data
+        : Array.isArray(data.data?.data) ? data.data.data
+        : null;
+      if (!items) {
+        this.logger.error(`[sumDocuments ${path}] Unexpected response shape. Body: ${rawBody.slice(0, 1000)}`);
+        throw new Error(`FlowAccount ${path}: unrecognized response shape`);
+      }
+
+      for (const doc of items) {
+        if (String(doc.statusString ?? '').toLowerCase() === 'void') continue;
+        total += Number(doc.grandTotal ?? 0) || 0;
+        count++;
+      }
+
+      const listTotal: number | null = typeof data.data?.total === 'number' ? data.data.total : null;
+      const hasMore = listTotal != null ? page * pageSize < listTotal : items.length === pageSize;
+      if (!hasMore) break;
+    }
+    return { total: Math.round(total * 100) / 100, count };
+  }
+
   // Pages through the entire contact list. Safety cap avoids an infinite loop if FlowAccount's
   // pagination signal ever behaves unexpectedly.
   async listAllContacts(maxPages = 200): Promise<FlowAccountContact[]> {
